@@ -169,3 +169,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Mac
+.DS_Store
+
+# GraphRAG outputs
+cache/
+output/
+logs/
+
+# Local data to be ignored
+data_local/
