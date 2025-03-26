@@ -22,7 +22,7 @@ cd src/graphrag
 graphrag query \
 --root . \
 --method local \
---query "What is the RPN for condenser"
+--query "Which subcomponent of Power unit has an RPN of 27."
 ```
 
 Global search for more high-level questions:
