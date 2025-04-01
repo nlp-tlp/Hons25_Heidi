@@ -1,5 +1,7 @@
-csv
+Dataset CSV:
 https://uniwa-my.sharepoint.com/personal/23643117_student_uwa_edu_au/_layouts/15/onedrive.aspx?e=5%3Af1d80a6d012f406384eba76ed4712448&sharingv2=true&fromShare=true&at=9&CT=1742525327997&OR=OWA%2DNT%2DMail&CID=82220eae%2Df710%2D8e67%2D254c%2D3986bfe5c59a&clickParams=eyJYLUFwcE5hbWUiOiJNaWNyb3NvZnQgT3V0bG9vayBXZWIgQXBwIiwiWC1BcHBWZXJzaW9uIjoiMjAyNTAzMDcwMDIuMTkiLCJPUyI6IldpbmRvd3MgMTAifQ%3D%3D&cidOR=Client&id=%2Fpersonal%2F23643117%5Fstudent%5Fuwa%5Fedu%5Fau%2FDocuments%2FDocuments%2FHonours&FolderCTID=0x0120004E8715D98C1C56418E255D4E54E3283B&view=0
+(Latest stable version also in "data/barrick v1.0/fmea_barrick_v1.0.csv")
 
-questions
+Questions:
 https://hackmd.io/@sellsol/HkoDzU5nyx
+(Latest stable version also in "competency qa/v1.0/fmea_qa_v1.0.md)
