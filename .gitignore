@@ -179,4 +179,4 @@ output/
 logs/
 
 # Local data to be ignored
-data_local/
+.vscode/
