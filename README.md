@@ -34,3 +34,15 @@ graphrag query \
 --method global \
 --query "What components have an RPN value over 40"
 ```
+
+### Text-to-Cypher
+
+#### Creating KG
+
+Make sure that a Neo4j instance has separately been set up. Retrieve your username and the password for that instance, and replace it in the .env file.
+
+#### Querying
+
+```
+python3 text_to_cypher.py "What is the average detection value over the full dataset?"
+```
