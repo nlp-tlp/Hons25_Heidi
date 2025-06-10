@@ -1,6 +1,6 @@
-import openai
-
 import logging
+
+from .llm import ChatClient
 
 # Prompts
 final_generator_prompt = """You are the final generator in a RAG system. The user question that has to be answered is:
@@ -26,9 +26,8 @@ logger = logging.getLogger("Generator")
 
 # Generator
 class FinalGenerator:
-    def __init__(self, model="gpt-4o"):
-        self.model = model
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    def __init__(self, client: ChatClient):
+        self.client = client
 
     def generate(self, question: str, retrieved_nodes: list[dict]):
         # Build prompt
@@ -37,13 +36,8 @@ class FinalGenerator:
             question=question,
             records=context_string
         )
-        logger.info(f"Prompting LLM using: {prompt}")
+        logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate final response from LLM
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
-        final_response = response.choices[0].message.content.strip()
+        final_response = self.client.chat(prompt=prompt)
         return final_response

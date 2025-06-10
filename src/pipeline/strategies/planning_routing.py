@@ -1,10 +1,11 @@
 from neo4j import GraphDatabase
-import openai
 
 import logging
 import uuid
 import json
 import re
+
+from ..llm import ChatClient, EmbeddingClient
 
 # Config - change as necessary
 import os
@@ -60,7 +61,7 @@ The question you should convert is:
 
 {question}
 
-Decompose this question into components that work best with structured KG search and unstructured semantic search. Output in the following format:
+Decompose this question into components that work best with structured KG search and unstructured semantic search. Output in only the following format, without any description, explanation, or formatting:
 
 [
   {{"type": "kg", "query": "<Cypher query string>"}},
@@ -76,10 +77,10 @@ Vector searches will only return the node id, and in the same node type it was g
 
 # Individual strategies
 class PlannerRetriever:
-    def __init__(self, model="gpt-4o"):
+    def __init__(self, client: ChatClient, embedding_client: EmbeddingClient):
         self.driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        self.model = model
+        self.client = client
+        self.embedding_client = embedding_client
 
         self.session_id = str(uuid.uuid4())
         self.working_node_ids = []
@@ -94,24 +95,40 @@ class PlannerRetriever:
         self.clear_session()
 
         # Generate plan
-        plan = self.generate_plan(question)
+        plan_text = self.generate_plan(question)
+
+        try:
+            plan = json.loads(plan_text)
+        except Exception as e:
+            logger.error(f"Error parsing plan: {e}")
+            return plan_text, [], f"Error during plan parsing: {e}"
 
         # Loop through plan, execute KG or vector query
-        for i, step in enumerate(plan):
-            is_final = i == len(plan) - 1
-            restrict = i > 0  # restrict to previous results
+        try:
+            for i, step in enumerate(plan):
+                is_final = i == len(plan) - 1
+                restrict = i > 0  # restrict to previous results
 
-            if step["type"] == "kg":
-                records = self.kg_query(step["query"], restrict=restrict, final=is_final)
-                logger.info(f"Cypher query finished - Open pool of {len(records)} records from Neo4j.")
-            elif step["type"] == "vector":
-                records = self.vector_search(step["search"], restrict=restrict, final=is_final)
-                logger.info(f"Vector search finished - Open pool of {len(records)} records from Neo4j.")
-            else:
-                raise ValueError(f"Unknown plan type: {step['type']}")
+                if step["type"] == "kg":
+                    records = self.kg_query(step["query"], restrict=restrict, final=is_final)
+                    logger.info(f"Cypher query finished - Open pool of {len(records)} records from Neo4j.")
 
-            if is_final:
-                return plan, records
+                    if len(records) == 0:
+                        return plan, [], None
+                elif step["type"] == "vector":
+                    records = self.vector_search(step["search"], restrict=restrict, final=is_final)
+                    logger.info(f"Vector search finished - Open pool of {len(records)} records from Neo4j.")
+
+                    if len(records) == 0:
+                        return plan, [], None
+                else:
+                    raise ValueError(f"Unknown plan type: {step['type']}")
+
+                if is_final:
+                    return plan, records, None
+        except Exception as e:
+            logger.error(f"Error during retrieval: {e}")
+            return plan, [], f"Error during plan execution: {e}"
 
     def generate_plan(self, question: str):
         # Build prompt
@@ -119,24 +136,14 @@ class PlannerRetriever:
             schema=schema_context,
             question=question
         )
-        logger.info(f"Prompting LLM using: {prompt}")
+        logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate plan and component queries from LLM
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
-        raw_content = response.choices[0].message.content.strip()
-        plan_text = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_content, flags=re.MULTILINE).strip() # Remove markdown if present
+        raw_response = self.client.chat(prompt=prompt)
+        plan_text = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
 
-        try:
-            logger.info(f"Generated Plan:\n{plan_text}")
-            plan = json.loads(plan_text)
-            return plan
-        except Exception as e:
-            logger.error(f"Error parsing plan: {e}")
-            return []
+        logger.info(f"Generated Plan:\n{plan_text}")
+        return plan_text
 
     def kg_query(self, query: str, restrict=False, final=False):
         with self.driver.session() as session:
@@ -152,7 +159,6 @@ class PlannerRetriever:
                 full_query = query
                 params = {}
 
-            print("WORKING IDS", self.working_node_ids)
             logging.info(f"Running Cypher query:\n{full_query}")
             result = session.run(full_query, **params)
             records = [record.data() for record in result]
@@ -167,9 +173,7 @@ class PlannerRetriever:
             return records
 
     def vector_search(self, search: str, threshold=0.65, restrict=False, final=False):
-        search_embedding = self.client.embeddings.create(
-            input=search, model=EMBEDDING_MODEL, dimensions=256
-        ).data[0].embedding
+        search_embedding = self.embedding_client.embed(text=search)
 
         with self.driver.session() as session:
             filter_clause = ""
@@ -198,7 +202,6 @@ class PlannerRetriever:
             RETURN n, score, elementId(n) AS id
             """
 
-            print("WORKING IDS", self.working_node_ids)
             logging.info(f"Running vector search:\n{query}")
             result = session.run(query, **params)
             records = [record.data() for record in result]

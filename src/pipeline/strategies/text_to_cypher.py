@@ -1,17 +1,15 @@
 from neo4j import GraphDatabase
-import openai
 
 import logging
 import re
 
-from pipeline.final_generator import FinalGenerator
+from ..llm import ChatClient
 
 # Config - change as necessary
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 
@@ -71,10 +69,9 @@ Answer this question using the following already retrieved context. Assume these
 
 # Retriever
 class TextToCypherRetriever:
-    def __init__(self, model="gpt-4o"):
+    def __init__(self, client: ChatClient):
         self.driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
-        self.model = model
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        self.client = client
 
     def retrieve(self, question: str | None):
         if question is None:
@@ -92,10 +89,10 @@ class TextToCypherRetriever:
                 result = session.run(query)
                 records = [record.data() for record in result]
             logger.info(f"Retrieved {len(records)} records from Neo4j.")
-            return query, records
+            return query, records, None
         except Exception as e:
             logger.error(f"Error running Cypher: {e}")
-            return query, []
+            return query, [], f"Error during Cypher execution: {e}"
 
     def generate_cypher(self, question: str):
         # Build prompt
@@ -103,19 +100,16 @@ class TextToCypherRetriever:
             schema=schema_context,
             question=question
         )
-        logger.info(f"Prompting LLM using: {prompt}")
+        logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate Cypher from LLM
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
-        raw_content = response.choices[0].message.content.strip()
-        cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_content, flags=re.MULTILINE).strip() # Remove markdown if present
+        raw_response = self.client.chat(prompt=prompt)
+        cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
 
 # Example usage
+# from ..final_generator import FinalGenerator
+
 # example_question = "What components have an RPN value over 35"
 # retriever = TextToCypherRetriever(model="gpt-4o")
 # retrieved_records = retriever.retrieve(question=example_question)
