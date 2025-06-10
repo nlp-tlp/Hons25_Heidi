@@ -16,7 +16,7 @@ model_name_to_client = {
     "mxbai-embed-large": mxbai_embedder
 }
 
-def query(question: str, schema: str, strategy: str = "text_to_cypher",
+def query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedding_model: str = "text-embedding-3-small") -> str:
     # Ignore the passed in schema context for now
 

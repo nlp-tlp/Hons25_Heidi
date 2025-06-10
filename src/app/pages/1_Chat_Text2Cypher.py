@@ -11,8 +11,6 @@ st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 # Chat and settings history
 if "chat_history_T2C" not in st.session_state:
     st.session_state.chat_history_T2C = []
-if "schema_context" not in st.session_state:
-    st.session_state.schema_context = "Default schema context..."  # fallback if never set
 
 st.title("Query Interface")
 st.markdown("This chat runs a **Text2Cypher** strategy. Given the user's question and some appended context, the configured LLM is made to create Cypher code to execute against the existing Neo4j database. After relevant information is retrieved, they are again passed to an LLM for generating a final response.")
@@ -81,7 +79,6 @@ if question:
 
             cypher_query, results, response, error = query(
                 question=question,
-                schema=st.session_state.schema_context,
                 strategy="text_to_cypher",
                 retriever_model=st.session_state.active_retriever_model,
                 generator_model=st.session_state.active_generator_model
