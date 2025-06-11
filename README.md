@@ -1,6 +1,15 @@
 # Honours - Heidi Leow
 
-## Pipelines setup
+## Run app demo
+
+Run streamlit app for chat interface:
+
+```
+cd app
+streamlit run Chat_Planner.py
+```
+
+## Experimentation setup
 
 ### GraphRAG
 
@@ -9,7 +18,7 @@ Note that the prompts directory is the default on initialisation by the package.
 #### Indexing to KG
 
 ```
-cd src/graphrag
+cd experimental/graphrag
 graphrag index --root .
 ```
 
@@ -18,7 +27,7 @@ graphrag index --root .
 Local search for more specific questions:
 
 ```
-cd src/graphrag
+cd experimental/graphrag
 graphrag query \
 --root . \
 --method local \
@@ -28,7 +37,7 @@ graphrag query \
 Global search for more high-level questions:
 
 ```
-cd src/graphrag
+cd experimental/graphrag
 graphrag query \
 --root . \
 --method global \
@@ -44,5 +53,6 @@ Make sure that a Neo4j instance has separately been set up. Retrieve your userna
 #### Querying
 
 ```
+cd experimental/text_to_cypher
 python3 text_to_cypher.py "What is the average detection value over the full dataset?"
 ```
