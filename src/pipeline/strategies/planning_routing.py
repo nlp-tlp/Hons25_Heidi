@@ -51,7 +51,7 @@ Constraints:
 - Integer properties on FailureMode require exact matching/range-based queries.
 - All other fields are text-based, and require substring-matching/fuzzy-matching. Do not assume that the user has given the right spelling/ casing in the question, and do not assume the data already in the system is correctly spelled either.
 
-Embeddings: Attached on the nodes FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls. Only embeds the textual information in that individual node."""
+Embeddings: Attached on the nodes FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls. Only embeds the textual information in that individual node. Do not access these directly in Cypher queries - these are used with prewritten queries in the vector search calls."""
 
 planning_prompt = """You are a system that converts natural language questions into retrieval plans. There are two possible modes of retrieval - vector embedding search and KG Cypher queries. Use the following schema and information to understand the Neo4j graph:
 
@@ -71,9 +71,9 @@ Decompose this question into components that work best with structured KG search
 
 Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, only return the node id. Do not use '$' variables in the queries.
 
-If not the first retrieval, the nodes from the previous result is stored in the variable "n" (already as full nodes, so do not add a filter clause for id filtering). Assume that subsequent steps will be given the same node type for "n" as the ones in the last "kg" component's return (e.g. if the last return were FailureEffect nodes, then the next vector search and KG queries will have n as the relevant nodes of the FailureEffect type. If you use something like `MATCH (n)-[:HAS_EFFECT]->(...)`, it will fail — because FailureEffect nodes don't have outgoing HAS_EFFECT relationships, and the direction may need to be reversed). Ensure that subsequent Cypher queries take into account this input type and do not use the wrong properties for the wrong type.
+If not the first retrieval, the nodes from the previous result is stored in the variable "n" (already as full nodes, so do not add a filter clause for id filtering). Assume that "n" will have the same entity type as the entity in the last "kg" return, with the relationships that exist for that entity in the provided schema. Ensure that subsequent queries take into account this input type, and that Cypher queries do not use the wrong properties for the wrong type.
 
-Vector searches will only return the node id, and in the same node type it was given. Properties need to be reretrieved via Cypher if necessary. The final step should return all relevant properties (instead of full nodes, e.g. RETURN fm.name, fm.rpn, ... instead of fm) needed to address the original question. More properties can be returned than necessary if they would make for a more informative natural language answer, however the nodes these properties are retrieved from must be defined in the same query - Assume that variables are not persisted across queries."""
+Vector searches will only return the node id, and in the same node type it was given. Properties need to be reretrieved via Cypher if necessary. The final step should return all relevant properties needed to address the original question (instead of full nodes, e.g. RETURN fm.name, fm.rpn, ... instead of fm). More properties can be returned than necessary if they would make for a more informative natural language answer."""
 
 # Individual strategies
 class PlannerRetriever:

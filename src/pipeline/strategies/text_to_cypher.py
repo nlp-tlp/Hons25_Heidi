@@ -89,7 +89,7 @@ class TextToCypherRetriever:
                 result = session.run(query)
                 records = [record.data() for record in result]
             logger.info(f"Retrieved {len(records)} records from Neo4j.")
-            return query, records, None
+            return query, self.remove_embeddings(records), None
         except Exception as e:
             logger.error(f"Error running Cypher: {e}")
             return query, [], f"Error during Cypher execution: {e}"
@@ -106,6 +106,13 @@ class TextToCypherRetriever:
         raw_response = self.client.chat(prompt=prompt)
         cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
+
+    def remove_embeddings(self, records):
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, dict) and "embedding" in value:
+                    del value["embedding"]
+        return records
 
 # Example usage
 # from ..final_generator import FinalGenerator
