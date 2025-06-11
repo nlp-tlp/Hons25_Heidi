@@ -1,3 +1,5 @@
+import re
+
 import logging
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +46,13 @@ class ChatClient:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response['message']['content'].strip()
+
+            content = response['message']['content'].strip()
+
+            if self.model == "deepseek-r1:14b":
+                content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+            return content
         elif self.provider == "openai":
             response = self.client.chat.completions.create(
                 model=self.model,

@@ -61,7 +61,7 @@ The question you should convert is:
 
 {question}
 
-Decompose this question into components that work best with structured KG search and unstructured semantic search. Output in only the following format, without any description, explanation, or formatting:
+Decompose this question into components that work best with structured KG search and unstructured semantic search. Each step should be used to narrow down the possible nodes and solve subproblems, and are not separate to each other but are used as a sequential retrieval process. Output in only the following format, without any description, explanation, or formatting:
 
 [
   {{"type": "kg", "query": "<Cypher query string>"}},

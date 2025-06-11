@@ -5,6 +5,7 @@ from .llm import ChatClient, EmbeddingClient
 
 gpt4o_client = ChatClient(provider="openai", model="gpt-4o")
 llama32_client = ChatClient(provider="ollama", model="llama3.2")
+deepseekr1_client = ChatClient(provider="ollama", model="deepseek-r1:14b")
 
 embedding3small_embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small", dimensions=256)
 mxbai_embedder = EmbeddingClient(provider="ollama", model="mxbai-embed-large")
@@ -13,7 +14,8 @@ model_name_to_client = {
     "llama3.2": llama32_client,
     "gpt-4o": gpt4o_client,
     "text-embedding-3-small": embedding3small_embedder,
-    "mxbai-embed-large": mxbai_embedder
+    "mxbai-embed-large": mxbai_embedder,
+    "deepseek-r1:14b": deepseekr1_client
 }
 
 def query(question: str, strategy: str = "text_to_cypher",

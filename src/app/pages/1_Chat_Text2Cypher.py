@@ -28,15 +28,15 @@ with st.sidebar:
     # Temporary selection before save
     retriever = st.selectbox(
         "Retriever LLM",
-        options=["gpt-4o", "llama3.2"],
-        index=["gpt-4o", "llama3.2"].index(st.session_state.active_retriever_model),
+        options=["gpt-4o", "llama3.2", "deepseek-r1:14b"],
+        index=["gpt-4o", "llama3.2", "deepseek-r1:14b"].index(st.session_state.active_retriever_model),
         key="temp_retriever_model"
     )
 
     generator = st.selectbox(
         "Generator LLM",
-        options=["gpt-4o", "llama3.2"],
-        index=["gpt-4o", "llama3.2"].index(st.session_state.active_generator_model),
+        options=["gpt-4o", "llama3.2", "deepseek-r1:14b"],
+        index=["gpt-4o", "llama3.2", "deepseek-r1:14b"].index(st.session_state.active_generator_model),
         key="temp_generator_model"
     )
 
