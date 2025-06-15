@@ -1,4 +1,6 @@
 from neo4j import GraphDatabase
+from pydantic import BaseModel
+from typing import Literal
 
 import logging
 import uuid
@@ -23,7 +25,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Agentic")
 
-# Prompts
+# Prompts and schemas
+class KGStep(BaseModel):
+    type: Literal["kg"]
+    query: str
+
+class VectorStep(BaseModel):
+    type: Literal["vector"]
+    search: str
+
+class ReasoningMixin:
+    reasoning: str
+
+class Plan(BaseModel, ReasoningMixin):
+    steps: list[KGStep | VectorStep]
+
 schema_context = """Entities:
 - (Spreadsheet {name: STRING})
 - (Subsystem {name: STRING})
@@ -61,17 +77,20 @@ The question you should convert is:
 
 {question}
 
-Decompose this question into components that work best with structured KG search and unstructured semantic search. Each step should be used to narrow down the possible nodes and solve subproblems, and are not separate to each other but are used as a sequential retrieval process. Output in only the following format, without any description, explanation, or formatting:
+Decompose this question into components that work best with structured KG search and unstructured semantic search. Each step should be used to narrow down the possible nodes and solve subproblems, and are not separate to each other but are used as a sequential retrieval process. Output in exactly the following format:
 
-[
-  {{"type": "kg", "query": "<Cypher query string>"}},
-  {{"type": "vector", "search": "<semantic search string>"}},
-  ...
-]
+{{
+    "steps": [
+        {{"type": "kg", "query": "<Cypher query string>"}},
+        {{"type": "vector", "search": "<semantic search string>"}},
+        ...
+    ],
+    "reasoning": "<thought process>"
+}}
 
-Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, only return the node id. Do not use '$' variables in the queries.
+Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, only return the node id. You may include any reasoning or thought processes only as part of the "reasoning" property. Do not use "$" variables or any other undefined variables.
 
-If not the first retrieval, the nodes from the previous result is stored in the variable "n" (already as full nodes, so do not add a filter clause for id filtering). Assume that "n" will have the same entity type as the entity in the last "kg" return, with the relationships that exist for that entity in the provided schema. Ensure that subsequent queries take into account this input type, and that Cypher queries do not use the wrong properties for the wrong type.
+If not the first retrieval, the nodes from the previous result is stored in the variable "n" (as full nodes and not a list, so do not add a filter clause for id filtering or use something like "IN"). Assume that "n" will have the same entity type as the entity in the last "kg" return, with the relationships that exist for that entity in the provided schema. Ensure that subsequent queries take into account this input type, and that Cypher queries do not use the wrong properties for the wrong type.
 
 Vector searches will only return the node id, and in the same node type it was given. Properties need to be reretrieved via Cypher if necessary. The final step should return all relevant properties needed to address the original question (instead of full nodes, e.g. RETURN fm.name, fm.rpn, ... instead of fm). More properties can be returned than necessary if they would make for a more informative natural language answer."""
 
@@ -105,9 +124,10 @@ class PlannerRetriever:
 
         # Loop through plan, execute KG or vector query
         try:
-            for i, step in enumerate(plan):
-                is_final = i == len(plan) - 1
+            for i, step in enumerate(plan["steps"]):
+                is_final = i == len(plan["steps"]) - 1
                 restrict = i > 0  # restrict to previous results
+                logger.info(f"Running step {i} of plan. Final: {is_final}, Restrict: {restrict}.")
 
                 if step["type"] == "kg":
                     records = self.kg_query(step["query"], restrict=restrict, final=is_final)
@@ -139,7 +159,7 @@ class PlannerRetriever:
         logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate plan and component queries from LLM
-        raw_response = self.client.chat(prompt=prompt)
+        raw_response = self.client.chat(prompt=prompt, response_format=Plan)
         plan_text = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
 
         logger.info(f"Generated Plan:\n{plan_text}")
@@ -165,7 +185,6 @@ class PlannerRetriever:
 
             # Clean up and store intermediate results
             if not final:
-                # print("RECORDS", self.remove_embeddings(records))
                 self.working_node_ids = self.extract_element_ids(records) # Update working set only if not final
             else:
                 records = self.remove_embeddings(records) # Remove embedding value to reduce size of final prompt

@@ -1,3 +1,5 @@
+from pydantic import BaseModel, RootModel
+
 import re
 
 import logging
@@ -35,16 +37,18 @@ class ChatClient:
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-    def chat(self, prompt: str) -> str:
+    def chat(self, prompt: str, response_format: BaseModel | RootModel = None) -> str:
         """Prompts the configured model.
 
         @param prompt: The prompt to send.
+        @param return_schema: Pydantic class to send as an argument to the provider for structured output.
         """
         logger.info(f"Prompting Chat LLM at provider {self.provider} model {self.model}")
         if self.provider == "ollama":
             response = self.client.chat(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
+                **({"format": response_format.model_json_schema()} if response_format is not None else {})
             )
 
             content = response['message']['content'].strip()
@@ -54,10 +58,11 @@ class ChatClient:
 
             return content
         elif self.provider == "openai":
-            response = self.client.chat.completions.create(
+            response = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature
+                temperature=self.temperature,
+                **({"response_format": response_format} if response_format is not None else {})
             )
             return response.choices[0].message.content.strip()
 
