@@ -1,22 +1,35 @@
-from .strategies.text_to_cypher import TextToCypherRetriever
-from .strategies.planning_routing import PlannerRetriever
-from .final_generator import FinalGenerator
-from .llm import ChatClient, EmbeddingClient
+import yaml
 
-gpt4o_client = ChatClient(provider="openai", model="gpt-4o")
-llama32_client = ChatClient(provider="ollama", model="llama3.2")
-deepseekr1_client = ChatClient(provider="ollama", model="deepseek-r1:14b")
+import os
+import sys
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(SRC_PATH)
 
-embedding3small_embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small", dimensions=256)
-mxbai_embedder = EmbeddingClient(provider="ollama", model="mxbai-embed-large")
+from pipeline.strategies.text_to_cypher import TextToCypherRetriever
+from pipeline.strategies.planning_routing import PlannerRetriever
+from pipeline.final_generator import FinalGenerator
+from pipeline.llm import ChatClient, EmbeddingClient
 
-model_name_to_client = {
-    "llama3.2": llama32_client,
-    "gpt-4o": gpt4o_client,
-    "text-embedding-3-small": embedding3small_embedder,
-    "mxbai-embed-large": mxbai_embedder,
-    "deepseek-r1:14b": deepseekr1_client
-}
+# Load available models from models.yaml
+chat_models = {}
+embedding_models = {}
+CONFIG_PATH = os.path.join(SRC_PATH, "models.yaml")
+with open(CONFIG_PATH) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+
+    for model in config["chat_models"]:
+        name, provider = model["name"], model["provider"]
+        chat_models[name] = ChatClient(provider=provider, model=name)
+
+    for model in config["embedding_models"]:
+        name, provider, args = model["name"], model["provider"], model["options"]
+        embedding_models[name] = EmbeddingClient(provider=provider, model=name, **args)
+
+def get_chat_model_names():
+    return list(chat_models.keys())
+
+def get_embedding_model_names():
+    return list(embedding_models.keys())
 
 def query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedding_model: str = "text-embedding-3-small") -> str:
@@ -24,21 +37,21 @@ def query(question: str, strategy: str = "text_to_cypher",
 
     match strategy:
         case "text_to_cypher":
-            text_to_cypher_retriever = TextToCypherRetriever(client=model_name_to_client[retriever_model])
+            text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model])
             cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question)
             if error:
                 return cypher_query, results, "Error has occurred.", error
 
-            final_generator = FinalGenerator(client=model_name_to_client[generator_model])
+            final_generator = FinalGenerator(client=chat_models[generator_model])
             response = final_generator.generate(question=question, retrieved_nodes=results)
             return cypher_query, results, response, None
         case "planning_routing":
-            planning_routing_retriever = PlannerRetriever(client=model_name_to_client[retriever_model], embedding_client=model_name_to_client[embedding_model])
+            planning_routing_retriever = PlannerRetriever(client=chat_models[retriever_model], embedding_client=embedding_models[embedding_model])
             plan, last_results, error = planning_routing_retriever.retrieve(question=question)
             if error:
                 return plan, last_results, "Error has occurred.", error
 
-            final_generator = FinalGenerator(client=model_name_to_client[generator_model])
+            final_generator = FinalGenerator(client=chat_models[generator_model])
             response = final_generator.generate(question=question, retrieved_nodes=last_results)
             return plan, last_results, response, None
         case _:

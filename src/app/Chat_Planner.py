@@ -1,10 +1,13 @@
 import streamlit as st
 import json
 
-import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import sys
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(SRC_PATH)
+
 from pipeline.controller import query
+from helpers import sidebar_model_selection
 
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 
@@ -17,43 +20,7 @@ st.markdown("This chat runs a **Planning/Routing** strategy. Given the user's qu
 
 # Sidebar model selection
 with st.sidebar:
-    st.markdown("### Model Configuration")
-
-    # degaults
-    if "active_retriever_model" not in st.session_state:
-            st.session_state.active_retriever_model = "llama3.2"
-    if "active_generator_model" not in st.session_state:
-        st.session_state.active_generator_model = "llama3.2"
-    if "active_embedding_model" not in st.session_state:
-            st.session_state.active_embedding_model = "text-embedding-3-small"
-
-    # Temporary selection before save
-    retriever = st.selectbox(
-        "Retriever LLM",
-        options=["gpt-4o", "llama3.2", "deepseek-r1:14b"],
-        index=["gpt-4o", "llama3.2", "deepseek-r1:14b"].index(st.session_state.active_retriever_model),
-        key="temp_retriever_model"
-    )
-
-    generator = st.selectbox(
-        "Generator LLM",
-        options=["gpt-4o", "llama3.2", "deepseek-r1:14b"],
-        index=["gpt-4o", "llama3.2", "deepseek-r1:14b"].index(st.session_state.active_generator_model),
-        key="temp_generator_model"
-    )
-
-    embedder = st.selectbox(
-        "Embedding model",
-        options=["text-embedding-3-small", "mxbai-embed-large"],
-        index=["text-embedding-3-small", "mxbai-embed-large"].index(st.session_state.active_embedding_model),
-        key="temp_embedding_model"
-    )
-
-    if st.button("Apply settings for next submit"):
-        st.session_state.active_retriever_model = st.session_state.temp_retriever_model
-        st.session_state.active_generator_model = st.session_state.temp_generator_model
-        st.session_state.active_embedding_model = st.session_state.temp_embedding_model
-        st.success("Settings applied successfully. These will be used on your next query.")
+    sidebar_model_selection(uses_embedder=True)
 
 # Display chat history
 for entry in st.session_state.chat_history_planner:

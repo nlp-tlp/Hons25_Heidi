@@ -88,7 +88,7 @@ Decompose this question into components that work best with structured KG search
     "reasoning": "<thought process>"
 }}
 
-Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, only return the node id. You may include any reasoning or thought processes only as part of the "reasoning" property. Do not use "$" variables or any other undefined variables.
+Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, end the query with `RETURN DISTINCT elementId(n) AS id`. You may include any reasoning or thought processes only as part of the "reasoning" property. Do not use "$" variables or any other undefined variables.
 
 If not the first retrieval, the nodes from the previous result is stored in the variable "n" (as full nodes and not a list, so do not add a filter clause for id filtering or use something like "IN"). Assume that "n" will have the same entity type as the entity in the last "kg" return, with the relationships that exist for that entity in the provided schema. Ensure that subsequent queries take into account this input type, and that Cypher queries do not use the wrong properties for the wrong type.
 
@@ -227,7 +227,6 @@ class PlannerRetriever:
 
             # Clean up and store intermediate results
             if not final:
-                # print("RECORDS", self.remove_embeddings(records))
                 self.working_node_ids = self.extract_element_ids(records) # Update working set only if not final
             else:
                 records = self.remove_embeddings(records) # Remove embedding value to reduce size of final prompt
