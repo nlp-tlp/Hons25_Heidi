@@ -1,7 +1,10 @@
 from pydantic import Field
 import csv
 
-from skb import SKB, SKBSchema, SKBNode
+import os
+from dotenv import load_dotenv
+
+from skb import SKB, SKBSchema, SKBNode, Neo4jSKB
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -97,18 +100,32 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
 
     return skb
 
+# ----------------- Processing space ------------------
+
 SOURCE_CSV = "fmea_barrick_filled.csv"
 STORE_PKL = "skb.pkl"
+DEBUG_PKL = "skb_debug.pkl"
 
-# Load from CSV
-skb = SKB(BarrickSchema)
-load_from_barrick_csv(skb, SOURCE_CSV)
-entities = skb.get_entities()
+load_dotenv()
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 
-# Save to PKL
-skb.save_pickle(STORE_PKL)
+## Print nicely formatted schema
+# print(BarrickSchema.schema_to_jsonlike_str())
 
-# Load from PKL
+## Load from CSV
+# skb = SKB(BarrickSchema)
+# load_from_barrick_csv(skb, SOURCE_CSV, 5)
+# entities = skb.get_entities()
+
+## Save to PKL
+# skb.save_pickle(DEBUG_PKL)
+
+## Load from PKL
 # skb_loaded = SKB(BarrickSchema)
 # skb_loaded.load_pickle(STORE_PKL)
 # entities_loaded = skb_loaded.get_entities()
+
+## Parse to Neo4j
+# neo4j_parser = Neo4jSKB(NEO4J_URI, NEO4J_AUTH)
+# neo4j_parser.parse(skb_loaded)
