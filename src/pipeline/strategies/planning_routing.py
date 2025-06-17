@@ -7,7 +7,11 @@ import uuid
 import json
 import re
 
-from ..llm import ChatClient, EmbeddingClient
+import os
+import sys
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(SRC_PATH)
+from pipeline.llm import ChatClient, EmbeddingClient
 
 # Config - change as necessary
 import os
