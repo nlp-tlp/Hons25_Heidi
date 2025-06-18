@@ -4,7 +4,7 @@ import pickle
 import json
 
 from neo4j import GraphDatabase
-from langchain_community.vectorstores import FAISS
+from langchain_chroma import Chroma
 from langchain.docstore.document import Document
 from langchain_openai import OpenAIEmbeddings
 
@@ -141,10 +141,12 @@ class Neo4jSKB:
         #TODO: just execute the string against the db - do during integration test with the pipeline
         pass
 
-class FaissSKB:
-    def __init__(self): # TODO: hardcoded to text-embedding-3-small for now
+class ChromaSKB:
+    def __init__(self, persist_directory: str): # hardcoded to text-embedding-3-small for now
         self.client = OpenAIEmbeddings(model="text-embedding-3-small")
-        self.vectorstore: FAISS = None
+        self.vectorstore: Chroma = None
+        self.persist_directory = persist_directory
+        self.collection_name = "skb_chroma"
 
     def parse(self, skb: SKB):
         docs = []
@@ -153,20 +155,41 @@ class FaissSKB:
             if not semantic_fields:
                 continue
 
-            text = " | ".join(v for v in semantic_fields.values())
-            meta = {
-                "external_id": node_id,
-                "type": type(node).__name__
-            }
-            docs.append(Document(page_content=text, metadata=meta))
+            text = " | ".join(v.lower() for v in semantic_fields.values())
+            meta = {"type": type(node).__name__, "id": node_id} # id field doesn't have built-in filtering
+            docs.append(Document(id=node_id, page_content=text, metadata=meta))
 
-        self.vectorstore = FAISS.from_documents(docs, self.client, normalize_L2=True)
+        self.vectorstore = Chroma.from_documents(
+            collection_name=self.collection_name,
+            documents=docs,
+            embedding=self.client,
+            persist_directory=self.persist_directory,
+            collection_metadata={"hnsw:space": "cosine"},
 
-    def save(self, filepath: str):
-        self.vectorstore.save_local(filepath)
+        )
 
-    def load(self, filepath: str):
-        self.vectorstore = FAISS.load_local(filepath, self.client, allow_dangerous_deserialization=True, normalize_L2=True)
+    def load(self):
+        self.vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=self.client,
+            persist_directory=self.persist_directory,
+            collection_metadata={"hnsw:space": "cosine"},
+        )
+
+    def nuke(self): # ! Will remove the directory in its entirety
+        import os
+        import shutil
+
+        if os.path.exists(self.persist_directory):
+            shutil.rmtree(self.persist_directory)
+        else:
+            "Directory not found"
+
+        # Below doesn't nuke directory but doesn't get rid of uuid fragment directories
+        # ids = self.vectorstore._collection.get()['ids']
+        # if ids:
+        #     self.vectorstore._collection.delete(ids)
+        # self.vectorstore.reset_collection()
 
     def similarity_search(
         self,
@@ -174,27 +197,35 @@ class FaissSKB:
         k: int = None, threshold: float = None,
         filter_entity: str = None, filter_ids: list[str] = None
     ):
-        meta_filter = {}
-        if filter_entity:
-            meta_filter["type"] = filter_entity
-        if filter_ids:
-            meta_filter["external_id"] = {"$in": filter_ids}
+        if filter_entity and filter_ids:
+            meta_filter = {
+                "$and": [
+                    {"type": filter_entity},
+                    {"id": {"$in": filter_ids}}
+                ]
+            }
+        elif filter_entity:
+            meta_filter = {"type": filter_entity}
+        elif filter_ids:
+            meta_filter = {"id": {"$in": filter_ids}}
+        else:
+            meta_filter = {}
 
         if threshold is not None:
-            results = self.vectorstore.similarity_search_with_score(
+            results = self.vectorstore.similarity_search_with_relevance_scores(
                 query=search_string,
                 score_threshold=threshold,
                 filter=meta_filter if meta_filter else None
             )
         else: # default to top-K
-            results = self.vectorstore.similarity_search_with_score(
+            results = self.vectorstore.similarity_search_with_relevance_scores(
                 search_string,
                 k=k or 10,
                 filter=meta_filter if meta_filter else None
             )
 
         return [[
-            doc.metadata.get("external_id"),
+            doc.metadata.get("id"),
             doc.metadata.get("type"),
             doc.page_content,
             score

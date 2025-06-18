@@ -4,7 +4,7 @@ import csv
 import os
 from dotenv import load_dotenv
 
-from skb import SKB, SKBSchema, SKBNode, Neo4jSKB, FaissSKB
+from skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -107,6 +107,7 @@ STORE_PKL = "skb.pkl"
 DEBUG_PKL = "skb_debug.pkl"
 STORE_FAISS = "skb_faiss"
 DEBUG_FAISS = "skb_debug_faiss"
+STORE_CHROMA = "skb_chroma"
 
 load_dotenv()
 NEO4J_URI = os.getenv("NEO4J_URI")
@@ -125,20 +126,26 @@ NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 
 ## Load from PKL
 skb_loaded = SKB(BarrickSchema)
-skb_loaded.load_pickle(DEBUG_PKL)
+skb_loaded.load_pickle(STORE_PKL)
 entities_loaded = skb_loaded.get_entities()
 
+### Neo4j
 ## Parse to Neo4j
 # neo4j_parser = Neo4jSKB(NEO4J_URI, NEO4J_AUTH)
 # neo4j_parser.parse(skb_loaded)
 
-## Parse to FAISS
-faiss_parser = FaissSKB()
-faiss_parser.parse(skb_loaded)
-faiss_parser.save(DEBUG_FAISS)
+### Chroma
+## Parse to Chroma and query
+# chroma_parser = ChromaSKB(persist_directory=STORE_CHROMA)
+# chroma_parser.nuke()
+# chroma_parser.parse(skb_loaded)
+# results = chroma_parser.similarity_search("temperature", k=25, filter_entity="FailureEffect")
+# print(*results, sep="\n")
 
-faiss_loaded = FaissSKB()
-faiss_loaded.load(DEBUG_FAISS)
-results = faiss_loaded.similarity_search("temperature issues")
+## Load from Chroma and query
+chroma_loaded = ChromaSKB(persist_directory=STORE_CHROMA)
+chroma_loaded.load()
+results = chroma_loaded.similarity_search("temperature", k=15, filter_entity="FailureEffect")
 print(*results, sep="\n")
+
 
