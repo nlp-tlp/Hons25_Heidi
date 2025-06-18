@@ -4,7 +4,7 @@ import csv
 import os
 from dotenv import load_dotenv
 
-from skb import SKB, SKBSchema, SKBNode, Neo4jSKB
+from skb import SKB, SKBSchema, SKBNode, Neo4jSKB, FaissSKB
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -105,6 +105,8 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
 SOURCE_CSV = "fmea_barrick_filled.csv"
 STORE_PKL = "skb.pkl"
 DEBUG_PKL = "skb_debug.pkl"
+STORE_FAISS = "skb_faiss"
+DEBUG_FAISS = "skb_debug_faiss"
 
 load_dotenv()
 NEO4J_URI = os.getenv("NEO4J_URI")
@@ -122,10 +124,21 @@ NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 # skb.save_pickle(DEBUG_PKL)
 
 ## Load from PKL
-# skb_loaded = SKB(BarrickSchema)
-# skb_loaded.load_pickle(STORE_PKL)
-# entities_loaded = skb_loaded.get_entities()
+skb_loaded = SKB(BarrickSchema)
+skb_loaded.load_pickle(DEBUG_PKL)
+entities_loaded = skb_loaded.get_entities()
 
 ## Parse to Neo4j
 # neo4j_parser = Neo4jSKB(NEO4J_URI, NEO4J_AUTH)
 # neo4j_parser.parse(skb_loaded)
+
+## Parse to FAISS
+faiss_parser = FaissSKB()
+faiss_parser.parse(skb_loaded)
+faiss_parser.save(DEBUG_FAISS)
+
+faiss_loaded = FaissSKB()
+faiss_loaded.load(DEBUG_FAISS)
+results = faiss_loaded.similarity_search("temperature issues")
+print(*results, sep="\n")
+
