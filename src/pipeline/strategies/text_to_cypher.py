@@ -3,7 +3,14 @@ from neo4j import GraphDatabase
 import logging
 import re
 
-from ..llm import ChatClient
+import os
+import sys
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(SRC_PATH)
+
+from pipeline.llm import ChatClient
+from loader.skb_barrick import BarrickSchema
+from loader.skb import Neo4jSKB
 
 # Config - change as necessary
 import os
@@ -20,33 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger("TextToCypher")
 
 # Prompts
-schema_context = """Entities:
-- (Spreadsheet {name: STRING})
-- (Subsystem {name: STRING})
-- (Component {name: STRING})
-- (SubComponent {name: STRING})
-- (FailureMode {name: STRING, occurrence: INT, detection: INT, rpn: INT, severity: INT})
-- (FailureEffect {name: STRING})
-- (FailureCause {name: STRING})
-- (RecommendedAction {name: STRING})  [OPTIONAL]
-- (CurrentControls {name: STRING})  [OPTIONAL]
-
-Relationships:
-- (Spreadsheet)-[:CONTAINS]->(Subsystem)
-- (Subsystem)-[:HAS_COMPONENT]->(Component)
-- (Component)-[:HAS_SUB_COMPONENT]->(SubComponent)
-- (SubComponent)-[:HAS_FAILURE_MODE]->(FailureMode)
-- (FailureMode)-[:HAS_EFFECT]->(FailureEffect)
-- (FailureMode)-[:CAUSED_BY]->(FailureCause)
-- (FailureMode)-[:HAS_RECOMMENDED_ACTION]->(RecommendedAction)  [IF EXISTS]
-- (FailureMode)-[:HAS_CONTROLS]->(CurrentControls)  [IF EXISTS]
-- (FailureMode)-[:IN_SPREADSHEET]->(Spreadsheet)
-
-Constraints:
-- FailureModes are unique per SubComponent. Failure modes with identical names on different systems with different causes and effects exist, and should be treated as separate.
-- Similarly, SubComponents are unique per Component, and Components are unique per SubSystem.
-- Integer properties on FailureMode require exact matching/range-based queries.
-- All other fields are text-based, and require substring-matching/fuzzy-matching. This includes the names of the components and sub-components. Do not assume that the user has given the right spelling/ casing."""
+schema_context = BarrickSchema.schema_to_jsonlike_str()
 
 text_to_cypher_prompt = """You are a system that converts natural language questions into Cypher queries.
 Use the following schema to understand the Neo4j graph:
@@ -70,7 +51,7 @@ Answer this question using the following already retrieved context. Assume these
 # Retriever
 class TextToCypherRetriever:
     def __init__(self, client: ChatClient):
-        self.driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
+        self.neo4j_module = Neo4jSKB(uri=NEO4J_URI, auth=NEO4J_AUTH)
         self.client = client
 
     def retrieve(self, question: str | None):
@@ -85,11 +66,9 @@ class TextToCypherRetriever:
 
         # Run command
         try:
-            with self.driver.session() as session:
-                result = session.run(query)
-                records = [record.data() for record in result]
+            records = self.neo4j_module.query(query)
             logger.info(f"Retrieved {len(records)} records from Neo4j.")
-            return query, self.remove_embeddings(records), None
+            return query, self.remove_ids(records), None
         except Exception as e:
             logger.error(f"Error running Cypher: {e}")
             return query, [], f"Error during Cypher execution: {e}"
@@ -107,11 +86,11 @@ class TextToCypherRetriever:
         cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
 
-    def remove_embeddings(self, records):
+    def remove_ids(self, records):
         for record in records:
-            for key, value in record.items():
-                if isinstance(value, dict) and "embedding" in value:
-                    del value["embedding"]
+            for value in record.values():
+                if isinstance(value, dict) and "external_id" in value:
+                    del value["external_id"]
         return records
 
 # Example usage

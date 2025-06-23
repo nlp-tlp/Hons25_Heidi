@@ -10,10 +10,15 @@ from pipeline.strategies.planning_routing import PlannerRetriever
 from pipeline.final_generator import FinalGenerator
 from pipeline.llm import ChatClient, EmbeddingClient
 
+from loader.skb import ChromaSKB
+
+CONFIG_PATH = os.path.join(SRC_PATH, "models.yaml")
+CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH")
+
 # Load available models from models.yaml
 chat_models = {}
 embedding_models = {}
-CONFIG_PATH = os.path.join(SRC_PATH, "models.yaml")
+
 with open(CONFIG_PATH) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -31,9 +36,8 @@ def get_chat_model_names():
 def get_embedding_model_names():
     return list(embedding_models.keys())
 
-def query(question: str, strategy: str = "text_to_cypher",
+def rag_query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedding_model: str = "text-embedding-3-small") -> str:
-    # Ignore the passed in schema context for now
 
     match strategy:
         case "text_to_cypher":
@@ -56,3 +60,16 @@ def query(question: str, strategy: str = "text_to_cypher",
             return plan, last_results, response, None
         case _:
             return "Strategy not defined. Please check configuration."
+
+# Load up ChromaDB
+chroma_module = ChromaSKB(persist_directory=CHROMA_DB_PATH)
+chroma_module.load()
+
+def embeddings_search(search: str, embeddings_type: str = "sentence", metric: str = "cosine", k: int = None, threshold: float = None):
+    match embeddings_type:
+        case "sentence":
+            return chroma_module.similarity_search(search_string=search, k=k, threshold=threshold)
+        case _:
+            return "Embeddings type not defined. Please check configuration."
+
+
