@@ -2,6 +2,7 @@ from pydantic import BaseModel
 import hashlib
 import pickle
 import json
+import warnings
 
 from neo4j import GraphDatabase
 from langchain_chroma import Chroma
@@ -216,12 +217,21 @@ class ChromaSKB:
         else:
             meta_filter = {}
 
-        results = self.vectorstore.similarity_search_with_relevance_scores(
-            query=search_string,
-            score_threshold=threshold if threshold else None,
-            k=k if k else 25,
-            filter=meta_filter if meta_filter else None
-        )
+        with warnings.catch_warnings(record=True) as w:
+            results = self.vectorstore.similarity_search_with_relevance_scores(
+                query=search_string.lower(),
+                score_threshold=threshold if threshold else None,
+                k=k if k else 25,
+                filter=meta_filter if meta_filter else None
+            )
+
+            # Floating point makes exact matches go slightly above 1
+            # This truncates the warning to be less obnoxious in the terminal
+            for warning_item in w:
+                if issubclass(warning_item.category, UserWarning):
+                    print(f"Captured UserWarning: {str(warning_item.message)[:300]}...")
+                else:
+                    print(f"Captured other warning: {warning_item.message} ({warning_item.category.__name__})")
 
         return [[
             doc.metadata.get("id"),
