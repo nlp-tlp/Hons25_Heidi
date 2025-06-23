@@ -12,6 +12,7 @@ import sys
 SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(SRC_PATH)
 from pipeline.llm import ChatClient, EmbeddingClient
+from loader.skb_barrick import BarrickSchema
 
 # Config - change as necessary
 import os
@@ -44,34 +45,7 @@ class ReasoningMixin:
 class Plan(BaseModel, ReasoningMixin):
     steps: list[KGStep | VectorStep]
 
-schema_context = """Entities:
-- (Spreadsheet {name: STRING})
-- (Subsystem {name: STRING})
-- (Component {name: STRING})
-- (SubComponent {name: STRING})
-- (FailureMode {name: STRING, occurrence: INT, detection: INT, rpn: INT, severity: INT})
-- (FailureEffect {name: STRING})
-- (FailureCause {name: STRING})
-- (RecommendedAction {name: STRING})  [OPTIONAL]
-- (CurrentControls {name: STRING})  [OPTIONAL]
-
-Relationships:
-- (Spreadsheet)-[:CONTAINS]->(Subsystem)
-- (Subsystem)-[:HAS_COMPONENT]->(Component)
-- (Component)-[:HAS_SUB_COMPONENT]->(SubComponent)
-- (SubComponent)-[:HAS_FAILURE_MODE]->(FailureMode)
-- (FailureMode)-[:HAS_EFFECT]->(FailureEffect)
-- (FailureMode)-[:CAUSED_BY]->(FailureCause)
-- (FailureMode)-[:HAS_RECOMMENDED_ACTION]->(RecommendedAction)  [IF EXISTS]
-- (FailureMode)-[:HAS_CONTROLS]->(CurrentControls)  [IF EXISTS]
-- (FailureMode)-[:IN_SPREADSHEET]->(Spreadsheet)
-
-Constraints:
-- FailureModes are unique per Subsystem, Component, SubComponent combinations. Failure modes with identical names on different systems with different causes and effects exist, and should be treated as separate. When answering questions, the hierarchy should be specified unless obvious.
-- Integer properties on FailureMode require exact matching/range-based queries.
-- All other fields are text-based, and require substring-matching/fuzzy-matching. Do not assume that the user has given the right spelling/ casing in the question, and do not assume the data already in the system is correctly spelled either.
-
-Embeddings: Attached on the nodes FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls. Only embeds the textual information in that individual node. Do not access these directly in Cypher queries - these are used with prewritten queries in the vector search calls."""
+schema_context = BarrickSchema.schema_to_jsonlike_str()
 
 planning_prompt = """You are a system that converts natural language questions into retrieval plans. There are two possible modes of retrieval - vector embedding search and KG Cypher queries. Use the following schema and information to understand the Neo4j graph:
 
@@ -191,7 +165,7 @@ class PlannerRetriever:
             if not final:
                 self.working_node_ids = self.extract_element_ids(records) # Update working set only if not final
             else:
-                records = self.remove_embeddings(records) # Remove embedding value to reduce size of final prompt
+                records = self.remove_ids(records) # Remove embedding value to reduce size of final prompt
 
             return records
 
@@ -255,13 +229,12 @@ class PlannerRetriever:
                 ids.append(id)
         return ids
 
-    def remove_embeddings(self, records):
+    def remove_ids(self, records):
         for record in records:
             for key, value in record.items():
-                if isinstance(value, dict) and "embedding" in value:
-                    del value["embedding"]
+                if isinstance(value, dict) and "external_id" in value:
+                    del value["external_id"]
         return records
-
 
 # Example usage
 # example_question = "In the Fuel System component, what are the failure modes that are associated with temperature issues as a failure effect (temperature issues in failure effect node not failure mode)? Let me know what the associated failure effects were as well along with the failure modes."

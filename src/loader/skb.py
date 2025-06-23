@@ -22,6 +22,7 @@ class SKBSchema:
                 meta = [field.annotation.__name__]
 
                 if field.json_schema_extra.get("relation"):
+                    field_name = field_name.upper()
                     meta.pop()
                     meta.append(f"relation_to {field.json_schema_extra.get('dest')}")
                 if field.json_schema_extra.get("id"):
@@ -138,8 +139,8 @@ class Neo4jSKB:
                         session.run(query, {"from_id": node_id, "to_id": target_id})
 
     def query(self, query: str):
-        #TODO: just execute the string against the db - do during integration test with the pipeline
-        pass
+        with self.driver.session() as session:
+            session.run(query)
 
 class ChromaSKB:
     def __init__(self, persist_directory: str): # hardcoded to text-embedding-3-small for now

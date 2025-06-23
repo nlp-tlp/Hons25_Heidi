@@ -33,7 +33,6 @@ def get_embedding_model_names():
 
 def query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedding_model: str = "text-embedding-3-small") -> str:
-    # Ignore the passed in schema context for now
 
     match strategy:
         case "text_to_cypher":
