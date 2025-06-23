@@ -138,9 +138,13 @@ class Neo4jSKB:
                         query = self.template_insert_relation(from_label, rel_name, to_label)
                         session.run(query, {"from_id": node_id, "to_id": target_id})
 
-    def query(self, query: str):
+    def query(self, query: str, filter_ids: list[str] = None):
         with self.driver.session() as session:
-            session.run(query)
+            if filter_ids:
+                result = session.run(query, **{"ids": filter_ids})
+            else:
+                result = session.run(query)
+            return [record.data() for record in result]
 
 class ChromaSKB:
     def __init__(self, persist_directory: str): # hardcoded to text-embedding-3-small for now
@@ -212,18 +216,12 @@ class ChromaSKB:
         else:
             meta_filter = {}
 
-        if threshold is not None:
-            results = self.vectorstore.similarity_search_with_relevance_scores(
-                query=search_string,
-                score_threshold=threshold,
-                filter=meta_filter if meta_filter else None
-            )
-        else: # default to top-K
-            results = self.vectorstore.similarity_search_with_relevance_scores(
-                search_string,
-                k=k or 10,
-                filter=meta_filter if meta_filter else None
-            )
+        results = self.vectorstore.similarity_search_with_relevance_scores(
+            query=search_string,
+            score_threshold=threshold if threshold else None,
+            k=k if k else 25,
+            filter=meta_filter if meta_filter else None
+        )
 
         return [[
             doc.metadata.get("id"),

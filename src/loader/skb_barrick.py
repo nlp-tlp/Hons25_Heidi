@@ -4,7 +4,7 @@ import csv
 import os
 from dotenv import load_dotenv
 
-from skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB
+from .skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -125,9 +125,9 @@ NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 # skb.save_pickle(DEBUG_PKL)
 
 ## Load from PKL
-skb_loaded = SKB(BarrickSchema)
-skb_loaded.load_pickle(STORE_PKL)
-entities_loaded = skb_loaded.get_entities()
+# skb_loaded = SKB(BarrickSchema)
+# skb_loaded.load_pickle(STORE_PKL)
+# entities_loaded = skb_loaded.get_entities()
 
 ### Neo4j
 ## Parse to Neo4j
@@ -143,9 +143,9 @@ entities_loaded = skb_loaded.get_entities()
 # print(*results, sep="\n")
 
 ## Load from Chroma and query
-chroma_loaded = ChromaSKB(persist_directory=STORE_CHROMA)
-chroma_loaded.load()
-results = chroma_loaded.similarity_search("temperature", k=15, filter_entity="FailureEffect")
-print(*results, sep="\n")
+# chroma_loaded = ChromaSKB(persist_directory=STORE_CHROMA)
+# chroma_loaded.load()
+# results = chroma_loaded.similarity_search("temperature issues", k=15, filter_entity="FailureEffect")
+# print(*results, sep="\n")
 
 

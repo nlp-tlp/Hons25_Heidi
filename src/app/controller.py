@@ -31,7 +31,7 @@ def get_chat_model_names():
 def get_embedding_model_names():
     return list(embedding_models.keys())
 
-def query(question: str, strategy: str = "text_to_cypher",
+def rag_query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedding_model: str = "text-embedding-3-small") -> str:
 
     match strategy:
@@ -55,3 +55,7 @@ def query(question: str, strategy: str = "text_to_cypher",
             return plan, last_results, response, None
         case _:
             return "Strategy not defined. Please check configuration."
+
+def embeddings_search(search: str, embeddings_type: str = "sentence", metric: str = "cosine"):
+    pass
+

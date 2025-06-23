@@ -7,8 +7,10 @@ import os
 import sys
 SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(SRC_PATH)
+
 from pipeline.llm import ChatClient
 from loader.skb_barrick import BarrickSchema
+from loader.skb import Neo4jSKB
 
 # Config - change as necessary
 import os
@@ -49,7 +51,7 @@ Answer this question using the following already retrieved context. Assume these
 # Retriever
 class TextToCypherRetriever:
     def __init__(self, client: ChatClient):
-        self.driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
+        self.neo4j_module = Neo4jSKB(uri=NEO4J_URI, auth=NEO4J_AUTH)
         self.client = client
 
     def retrieve(self, question: str | None):
@@ -64,9 +66,7 @@ class TextToCypherRetriever:
 
         # Run command
         try:
-            with self.driver.session() as session:
-                result = session.run(query)
-                records = [record.data() for record in result]
+            records = self.neo4j_module.query(query)
             logger.info(f"Retrieved {len(records)} records from Neo4j.")
             return query, self.remove_ids(records), None
         except Exception as e:
@@ -88,7 +88,7 @@ class TextToCypherRetriever:
 
     def remove_ids(self, records):
         for record in records:
-            for key, value in record.items():
+            for value in record.values():
                 if isinstance(value, dict) and "external_id" in value:
                     del value["external_id"]
         return records

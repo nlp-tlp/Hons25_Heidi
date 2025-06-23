@@ -2,35 +2,15 @@ import logging
 
 from .llm import ChatClient
 
+import os
+import sys
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(SRC_PATH)
+
+from loader.skb_barrick import BarrickSchema
+
 # Prompts
-schema_context = """Entities:
-- (Spreadsheet {name: STRING})
-- (Subsystem {name: STRING})
-- (Component {name: STRING})
-- (SubComponent {name: STRING})
-- (FailureMode {name: STRING, occurrence: INT, detection: INT, rpn: INT, severity: INT})
-- (FailureEffect {name: STRING})
-- (FailureCause {name: STRING})
-- (RecommendedAction {name: STRING})  [OPTIONAL]
-- (CurrentControls {name: STRING})  [OPTIONAL]
-
-Relationships:
-- (Spreadsheet)-[:CONTAINS]->(Subsystem)
-- (Subsystem)-[:HAS_COMPONENT]->(Component)
-- (Component)-[:HAS_SUB_COMPONENT]->(SubComponent)
-- (SubComponent)-[:HAS_FAILURE_MODE]->(FailureMode)
-- (FailureMode)-[:HAS_EFFECT]->(FailureEffect)
-- (FailureMode)-[:CAUSED_BY]->(FailureCause)
-- (FailureMode)-[:HAS_RECOMMENDED_ACTION]->(RecommendedAction)  [IF EXISTS]
-- (FailureMode)-[:HAS_CONTROLS]->(CurrentControls)  [IF EXISTS]
-- (FailureMode)-[:IN_SPREADSHEET]->(Spreadsheet)
-
-Constraints:
-- FailureModes are unique per Subsystem, Component, SubComponent combinations. Failure modes with identical names on different systems with different causes and effects exist, and should be treated as separate. When answering questions, the hierarchy should be specified unless obvious.
-- Integer properties on FailureMode require exact matching/range-based queries.
-- All other fields are text-based, and require substring-matching/fuzzy-matching. Do not assume that the user has given the right spelling/ casing in the question, and do not assume the data already in the system is correctly spelled either.
-
-Embeddings: Attached on the nodes FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls. Only embeds the textual information in that individual node."""
+schema_context = BarrickSchema.schema_to_jsonlike_str()
 
 final_generator_prompt = """You are the final generator in a RAG system. The user question that has to be answered is:
 
