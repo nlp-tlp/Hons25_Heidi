@@ -4,7 +4,7 @@ import csv
 import os
 from dotenv import load_dotenv
 
-from .skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB
+from skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB, GloveLstmKB, FlairStackedKB
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -125,8 +125,8 @@ NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 # skb.save_pickle(DEBUG_PKL)
 
 ## Load from PKL
-# skb_loaded = SKB(BarrickSchema)
-# skb_loaded.load_pickle(STORE_PKL)
+skb_loaded = SKB(BarrickSchema)
+skb_loaded.load_pickle(STORE_PKL)
 # entities_loaded = skb_loaded.get_entities()
 
 ### Neo4j
@@ -148,4 +148,14 @@ NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 # results = chroma_loaded.similarity_search("temperature issues", k=15, filter_entity="FailureEffect")
 # print(*results, sep="\n")
 
+#### Glove
+# glove_module = GloveLstmKB(persist_directory="skb_glove_lstm", collection_name="skb_glove_lstm")
+# glove_module.parse(skb_loaded, max_nodes=50)
+# results = glove_module.similarity_search("heating", k=10)
+# print(*results, sep="\n")
 
+#### Flair stacked with Glove
+flair_module = FlairStackedKB(persist_directory="skb_flair_stacked", collection_name="skb_flair_stacked")
+flair_module.parse(skb_loaded, max_nodes=50)
+results = flair_module.similarity_search("temperature issues", k=50)
+print(*results, sep="\n")

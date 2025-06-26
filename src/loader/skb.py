@@ -9,6 +9,10 @@ from langchain_chroma import Chroma
 from langchain.docstore.document import Document
 from langchain_openai import OpenAIEmbeddings
 
+from flair.embeddings import WordEmbeddings, DocumentRNNEmbeddings, StackedEmbeddings, FlairEmbeddings, DocumentPoolEmbeddings
+from flair.data import Sentence
+import chromadb
+
 class SKBSchema:
     @classmethod
     def schema_to_jsonlike(cls):
@@ -171,7 +175,6 @@ class ChromaSKB:
             embedding=self.client,
             persist_directory=self.persist_directory,
             collection_metadata={"hnsw:space": "cosine"},
-
         )
 
     def load(self):
@@ -239,4 +242,225 @@ class ChromaSKB:
             doc.page_content,
             score
         ] for doc, score in results]
+
+class GloveLstmKB:
+    def __init__(self, persist_directory: str, collection_name: str):
+        self.vectorstore: Chroma = None
+        self.persist_directory = persist_directory
+        self.collection_name = collection_name
+
+        glove_embedding = WordEmbeddings("glove")
+        self.client = DocumentRNNEmbeddings([glove_embedding], rnn_type="LSTM")
+
+    def parse(self, skb: SKB, max_nodes: int = None):
+        docs = []
+        docs_meta = []
+        docs_embeddings = []
+        docs_ids = []
+        for i, (node_id, node) in enumerate(skb.get_entities().items()):
+            if max_nodes is not None and i >= max_nodes:
+                break
+
+            semantic_fields = node.get_semantic()
+            if not semantic_fields:
+                continue
+
+            text = " | ".join(v.lower() for v in semantic_fields.values())
+            meta = {"type": type(node).__name__, "id": node_id} # id field doesn't have built-in filtering
+
+            docs.append(text)
+            docs_meta.append(meta)
+            docs_embeddings.append(self.embed_sentence(text))
+            docs_ids.append(node_id)
+            # docs.append(Document(id=node_id, page_content=text, metadata=meta))
+
+        chroma_client = chromadb.Client()
+        collection = chroma_client.create_collection(name=self.collection_name, configuration={
+            "hnsw": {
+                "space": "cosine",
+            },
+        })
+        collection.add(
+            documents=docs,
+            metadatas=docs_meta,
+            embeddings=docs_embeddings,
+            ids=docs_ids,
+        )
+
+        self.vectorstore = Chroma(
+            client=chroma_client,
+            collection_name=self.collection_name,
+            persist_directory=self.persist_directory,
+        )
+
+    def embed_sentence(self, sentence: str):
+        sentence_object = Sentence(sentence)
+        self.client.embed(sentence_object)
+
+        return sentence_object.embedding.detach().numpy()
+
+    def nuke(self): # ! Will remove the directory in its entirety
+        import os
+        import shutil
+
+        if os.path.exists(self.persist_directory):
+            shutil.rmtree(self.persist_directory)
+        else:
+            "Directory not found"
+
+    def similarity_search(
+        self,
+        search_string: str,
+        k: int = None, threshold: float = None,
+        filter_entity: str = None, filter_ids: list[str] = None
+    ):
+        query_embedding = self.embed_sentence(search_string)
+
+        if filter_entity and filter_ids:
+            meta_filter = {
+                "$and": [
+                    {"type": filter_entity},
+                    {"id": {"$in": filter_ids}}
+                ]
+            }
+        elif filter_entity:
+            meta_filter = {"type": filter_entity}
+        elif filter_ids:
+            meta_filter = {"id": {"$in": filter_ids}}
+        else:
+            meta_filter = {}
+
+        # The vector version of this function doesn't be thresholding implemented
+        # The below implementation is similar to what langchain does in the back for the other version
+        docs_and_similarities = self.vectorstore.similarity_search_by_vector_with_relevance_scores(
+            embedding=query_embedding,
+            k=k if k else 25,
+            filter=meta_filter if meta_filter else None
+        )
+
+        if threshold is not None:
+            docs_and_similarities = [
+                (doc, similarity)
+                for doc, similarity in docs_and_similarities
+                if similarity >= threshold
+            ]
+
+        return [[
+            doc.metadata.get("id"),
+            doc.metadata.get("type"),
+            doc.page_content,
+            min(1.0 - score, 1.0)
+        ] for doc, score in docs_and_similarities]
+
+class FlairStackedKB:
+    def __init__(self, persist_directory: str, collection_name: str):
+        self.vectorstore: Chroma = None
+        self.persist_directory = persist_directory
+        self.collection_name = collection_name
+
+        stacked_flair_embedding = StackedEmbeddings([
+            FlairEmbeddings("news-forward"),
+            FlairEmbeddings("news-backward")
+        ])
+        self.client = DocumentPoolEmbeddings([stacked_flair_embedding], pooling="min")
+
+    def parse(self, skb: SKB, max_nodes: int = None):
+        docs = []
+        docs_meta = []
+        docs_embeddings = []
+        docs_ids = []
+        for i, (node_id, node) in enumerate(skb.get_entities().items()):
+            if max_nodes is not None and i >= max_nodes:
+                break
+
+            semantic_fields = node.get_semantic()
+            if not semantic_fields:
+                continue
+
+            text = " | ".join(v.lower() for v in semantic_fields.values())
+            meta = {"type": type(node).__name__, "id": node_id} # id field doesn't have built-in filtering
+
+            docs.append(text)
+            docs_meta.append(meta)
+            docs_embeddings.append(self.embed_sentence(text))
+            docs_ids.append(node_id)
+            # docs.append(Document(id=node_id, page_content=text, metadata=meta))
+
+        chroma_client = chromadb.Client()
+        collection = chroma_client.create_collection(name=self.collection_name, configuration={
+            "hnsw": {
+                "space": "cosine",
+            },
+        })
+        collection.add(
+            documents=docs,
+            metadatas=docs_meta,
+            embeddings=docs_embeddings,
+            ids=docs_ids,
+        )
+
+        self.vectorstore = Chroma(
+            client=chroma_client,
+            collection_name=self.collection_name,
+            persist_directory=self.persist_directory,
+        )
+
+    def embed_sentence(self, sentence: str):
+        sentence_object = Sentence(sentence)
+        self.client.embed(sentence_object)
+
+        return sentence_object.embedding.detach().numpy()
+
+    def nuke(self): # ! Will remove the directory in its entirety
+        import os
+        import shutil
+
+        if os.path.exists(self.persist_directory):
+            shutil.rmtree(self.persist_directory)
+        else:
+            "Directory not found"
+
+    def similarity_search(
+        self,
+        search_string: str,
+        k: int = None, threshold: float = None,
+        filter_entity: str = None, filter_ids: list[str] = None
+    ):
+        query_embedding = self.embed_sentence(search_string)
+
+        if filter_entity and filter_ids:
+            meta_filter = {
+                "$and": [
+                    {"type": filter_entity},
+                    {"id": {"$in": filter_ids}}
+                ]
+            }
+        elif filter_entity:
+            meta_filter = {"type": filter_entity}
+        elif filter_ids:
+            meta_filter = {"id": {"$in": filter_ids}}
+        else:
+            meta_filter = {}
+
+        # The vector version of this function doesn't be thresholding implemented
+        # The below implementation is similar to what langchain does in the back for the other version
+        docs_and_similarities = self.vectorstore.similarity_search_by_vector_with_relevance_scores(
+            embedding=query_embedding,
+            k=k if k else 25,
+            filter=meta_filter if meta_filter else None
+        )
+
+        if threshold is not None:
+            docs_and_similarities = [
+                (doc, similarity)
+                for doc, similarity in docs_and_similarities
+                if similarity >= threshold
+            ]
+
+        return [[
+            doc.metadata.get("id"),
+            doc.metadata.get("type"),
+            doc.page_content,
+            min(1.0 - score, 1.0)
+        ] for doc, score in docs_and_similarities]
 
