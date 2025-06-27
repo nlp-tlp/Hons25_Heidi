@@ -47,15 +47,11 @@ class Plan(BaseModel, ReasoningMixin):
 
 schema_context = BarrickSchema.schema_to_jsonlike_str()
 
-planning_prompt = """You are a system that converts natural language questions into retrieval plans. There are two possible modes of retrieval - vector embedding search and KG Cypher queries. Use the following schema and information to understand the Neo4j graph:
+planning_prompt = """You are a system that decomposes natural language questions into sequential retrieval steps over a semi-structured graph-based knowledge base. There are two types of retrieval steps:
+1. **"kg" (structured query)** - Cypher queries over the Neo4j graph using the provided schema.
+2. **"vector" (semantic search)** - Embedding-based similarity search over properties of nodes marked with `@match_semantically`.
 
-{schema}
-
-The question you should convert is:
-
-{question}
-
-Decompose this question into components that work best with structured KG search and unstructured semantic search. Each step should be used to narrow down the possible nodes and solve subproblems, and are not separate to each other but are used as a sequential retrieval process. Output in exactly the following format:
+Decompose the given question into a sequence of retrieval steps. Each step should help narrow down relevant nodes or answer subparts of the question. A single step is sufficient if the question is simple. Use the following JSON format exactly:
 
 {{
     "steps": [
@@ -63,14 +59,61 @@ Decompose this question into components that work best with structured KG search
         {{"type": "vector", "search": "<semantic search string>"}},
         ...
     ],
-    "reasoning": "<thought process>"
+    "reasoning": "<your thought process here>"
 }}
 
-Only decompose if needed - often a single step is sufficient. For each KG query component that is not the final one, end the query with `RETURN DISTINCT n.external_id AS id`. You may include any reasoning or thought processes only as part of the "reasoning" property. Do not use "$" variables or any other undefined variables.
+Here are some examples:
 
-If not the first retrieval, the nodes from the previous result is stored in the variable "n" that should be used (as full nodes and not a list, so do not add a filter clause for id filtering or use something like "IN"). Assume that "n" will have the same entity type as the entity in the last "kg" return, with the relationships that exist for that entity in the provided schema. Ensure that subsequent queries take into account this input type, and that Cypher queries do not use the wrong properties for the wrong type.
+Q: What components are affected by fluid leakage?
+A:
+{{
+  "steps": [
+    {{
+      "type": "vector",
+      "search": "fluid leakage"
+    }},
+    {{
+      "type": "kg",
+      "query": "MATCH (n)<-[:HAS_FAILURE_MODE]-(sc:SubComponent)<-[:HAS_SUBCOMPONENT]-(c:Component) RETURN DISTINCT c.name, c.description"
+    }}
+  ],
+  "reasoning": "..."
+}}
 
-Vector searches will only return the node id, and in the same node type it was given. Properties tagged with '@match_semantically' can be searched this way. The final step should return all relevant properties needed to address the original question (instead of full nodes, e.g. RETURN fm.name, fm.rpn, ... instead of fm), and properties need to be reretrieved via Cypher if necessary. More properties can be returned than necessary if they would make for a more informative natural language answer."""
+Q (different schema): Which articles have the phrase 'quantum entanglement' in the title and were published after 2020?
+A:
+{{
+  "steps": [
+    {{
+      "type": "kg",
+      "query": "MATCH (a:Article) WHERE a.title CONTAINS 'quantum entanglement' AND a.year > 2020 RETURN a.title, a.year, a.authors"
+    }}
+  ],
+  "reasoning": "Text search using Cypher's CONTAINS operator is appropriate here because the 'title' field is not marked for semantic matching. A single KG query suffices."
+}}
+
+---
+
+You are provided the following graph schema and node metadata:
+
+{schema}
+
+The question you should convert is:
+
+{question}
+
+---
+
+Planning rules:
+1. Only decompose the question if necessary. Many simple questions require a single step.
+2. After a non-final Cypher step, end the query with: `RETURN DISTINCT <alias>.external_id AS id`. This tells the system which nodes to use in the next step.
+3. Ensure that any step before a vector search step returns a node type with the property tagged `@match_semantically`, for which you want to perform the vector search on. Vector search steps take the nodes returned by the last step and returns a filtered down pool.
+4. After a final Cypher step, explicitly return named properties e.g. `RETURN n.name, n.age` rather than returning nodes. The final step should return all properties that would be considered valuable in an informative response to the question. Properties from previous steps should be re-retrived if necessary.
+5. Do not assume that names in the query will be exactly the same as they are in the database. It is possible that there are different capitalisations, or the user only knows a part of the name, and this has to be accounted for in Cypher queries.
+6. Do not use $ variables or assume prior definitions not in the prompt.
+7. Do not manually write Cypher constraints on ids like `WHERE id IN ...`. The set of full nodes returned from the last step are already stored in the `n` variable by the system, and should be used like a normal alias.
+8. Do not perform vector searches on entity types that do not have a property tagged `@match_semantically`. Not all string-type properties have a vector embedding.
+"""
 
 # Individual strategies
 class PlannerRetriever:

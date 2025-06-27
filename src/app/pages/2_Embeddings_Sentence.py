@@ -92,7 +92,7 @@ if search:
                 threshold=st.session_state.embeddings_sentence_threshold
             )
 
-            results = pd.DataFrame(([record[1], "  \n".join(textwrap.wrap(record[2], width=110)), "{:.4f}".format(record[3])] for record in records),
+            results = pd.DataFrame(([record[1], "  \n".join(textwrap.wrap(record[2], width=100)), "{:.4f}".format(record[3])] for record in records),
             columns=["Type", "Content", "Score"])
 
     st.session_state.embeddings_history_sentence.append({"role": "user", "search": search})
