@@ -1,6 +1,6 @@
 import logging
 
-from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, SKB, BarrickSchema
+from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, SKB, BarrickSchema, load_from_barrick_csv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -9,6 +9,10 @@ logging.basicConfig(
 
 skb_loaded = SKB(BarrickSchema)
 skb_loaded.load_pickle("databases/pkl/skb.pkl")
+
+def load_skb():
+    skb = SKB(BarrickSchema)
+    load_from_barrick_csv(skb, "fmea_barrick_filled.csv")
 
 def load_neo4j_skb():
     neo4j_skb = Neo4j_SKB()
