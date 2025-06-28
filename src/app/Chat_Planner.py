@@ -1,12 +1,7 @@
 import streamlit as st
 import json
 
-import os
-import sys
-SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(SRC_PATH)
-
-from app.controller import rag_query, get_chat_model_names, get_embedding_model_names
+from controller import rag_query, get_chat_model_names, get_embedder_names
 
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 
@@ -44,8 +39,8 @@ with st.sidebar:
 
         embedding_config = st.selectbox(
             "Embedding model",
-            options=get_embedding_model_names(),
-            index=get_embedding_model_names().index(st.session_state.active_embedding_model),
+            options=get_embedder_names(),
+            index=get_embedder_names().index(st.session_state.active_embedding_model),
         )
 
         submitted = st.form_submit_button("Apply settings for next submit")
@@ -94,7 +89,7 @@ if question:
                 strategy="planning_routing",
                 retriever_model=st.session_state.active_retriever_model,
                 generator_model=st.session_state.active_generator_model,
-                embedding_model=st.session_state.active_embedding_model
+                embedder=st.session_state.active_embedding_model
             )
 
     st.session_state.chat_history_planner.append({"role": "user", "msg": question})

@@ -7,30 +7,22 @@ from app.controller import embeddings_search
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 
 st.title("Vector Search Interface")
-st.markdown("This chat functions as a basic search for vector similarity calculated from **Sentence Embedding** models. The similar embeddings are retrieved from an existing vector database. Current embeddings have been generated from the OpenAI `text-embedding-3-small` model.")
+st.markdown("This chat functions as a basic search for vector embeddings using cosine similarity. The embeddings are retrieved from an existing ChromaDB vector database. Current embeddings have been generated from the `Flair` word embedding model using mean pooling to allow for sentences to be embedded.")
 
 # Chat and settings history
-if "embeddings_history_sentence" not in st.session_state:
-    st.session_state.embeddings_history_sentence = []
+if "embeddings_history_flair" not in st.session_state:
+    st.session_state.embeddings_history_flair = []
 
 # Sidebar config selection
 with st.sidebar:
     st.markdown ("### Configuration")
 
-    if "active_embeddings_model" not in st.session_state:
-        st.session_state.embeddings_sentence_metric = "cosine"
     if "embeddings_sentence_k" not in st.session_state:
         st.session_state.embeddings_sentence_k = 25
     if "embeddings_sentence_threshold" not in st.session_state:
         st.session_state.embeddings_sentence_threshold = None
 
     with st.form("config_form", border=False, enter_to_submit=False):
-        metric_config = st.selectbox(
-            "Similarity metric",
-            options=["cosine"],
-            index=0
-        )
-
         k_config = st.number_input(
             "Top-K",
             min_value=1,
@@ -48,7 +40,6 @@ with st.sidebar:
 
         submitted = st.form_submit_button("Apply settings for next submit")
         if submitted:
-            st.session_state.embeddings_sentence_metric = metric_config
             st.session_state.embeddings_sentence_k = k_config
             st.session_state.embeddings_sentence_threshold = threshold_config
 
@@ -60,10 +51,10 @@ role_to_icon = {
     "assistant": ":material/list:"
 }
 
-for entry in st.session_state.embeddings_history_sentence:
+for entry in st.session_state.embeddings_history_flair:
     with st.chat_message(entry["role"], avatar=role_to_icon[entry["role"]]):
         if "config" in entry:
-            st.markdown(f"**Configuration:** Metric: `{entry["config"]["metric"]}` | K: `{entry["config"]["k"]}` | Threshold: `{entry["config"]["threshold"]}`")
+            st.markdown(f"**Configuration:** K: `{entry["config"]["k"]}` | Threshold: `{entry["config"]["threshold"]}`")
 
         if entry["role"] == "user":
             st.markdown(entry["search"])
@@ -79,15 +70,13 @@ if search:
     with st.chat_message("assistant", avatar=":material/keyboard_return:"):
         with st.spinner("Searching..."):
             config_snapshot = {
-                "metric": st.session_state.embeddings_sentence_metric,
                 "k": st.session_state.embeddings_sentence_k,
                 "threshold": st.session_state.embeddings_sentence_threshold
             }
 
             records = embeddings_search(
                 search=search,
-                embeddings_type="sentence",
-                metric=st.session_state.embeddings_sentence_metric,
+                embeddings_type="flair mean-pooling",
                 k=st.session_state.embeddings_sentence_k,
                 threshold=st.session_state.embeddings_sentence_threshold
             )
@@ -95,6 +84,6 @@ if search:
             results = pd.DataFrame(([record[1], "  \n".join(textwrap.wrap(record[2], width=100)), "{:.4f}".format(record[3])] for record in records),
             columns=["Type", "Content", "Score"])
 
-    st.session_state.embeddings_history_sentence.append({"role": "user", "search": search})
-    st.session_state.embeddings_history_sentence.append({"role": "assistant", "results": results, "config": config_snapshot})
+    st.session_state.embeddings_history_flair.append({"role": "user", "search": search})
+    st.session_state.embeddings_history_flair.append({"role": "assistant", "results": results, "config": config_snapshot})
     st.rerun()

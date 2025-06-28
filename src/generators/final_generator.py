@@ -1,13 +1,7 @@
 import logging
 
-from .llm import ChatClient
-
-import os
-import sys
-SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(SRC_PATH)
-
-from loader.skb_barrick import BarrickSchema
+from llm import ChatClient
+from databases import BarrickSchema
 
 # Prompts
 schema_context = BarrickSchema.schema_to_jsonlike_str()
@@ -24,32 +18,20 @@ Here is some context on the way the data was stored that might be of use:
 
 {schema}"""
 
-# Config - change as necessary
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="\n=== %(levelname)s [%(name)s] ===\n%(message)s\n"
-)
-logger = logging.getLogger("Generator")
-
 # Generator
 class FinalGenerator:
     def __init__(self, client: ChatClient):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.client = client
 
     def generate(self, question: str, retrieved_nodes: list[dict]):
         # Cases to use prewritten answers
         if len(retrieved_nodes) == 0:
-            logger.info("No nodes retrieved, returning pre-written response.")
+            self.logger.info("No nodes retrieved, returning pre-written response.")
             return "No records could be found. Either the answer is that there are no such entities, or that the context given was insufficient to retrieve the right records. If you believe it is the latter, try rephrasing your question."
 
         if len(retrieved_nodes) > 50:
-            logger.info(f"Too many nodes retrieved: {len(retrieved_nodes)}, returning pre-written response.")
+            self.logger.info(f"Too many nodes retrieved: {len(retrieved_nodes)}, returning pre-written response.")
             return "Too many records were retrieved. Either the answer contains that many entities, or the model gave a bad plan of retrieval. If you believe it is the latter, try entering the question again."
 
         # Build prompt
@@ -59,7 +41,7 @@ class FinalGenerator:
             records=context_string,
             schema=schema_context
         )
-        logger.debug(f"Prompting LLM using: {prompt}")
+        self.logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate final response from LLM
         final_response = self.client.chat(prompt=prompt)
