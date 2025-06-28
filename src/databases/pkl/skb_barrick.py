@@ -1,10 +1,7 @@
 from pydantic import Field
 import csv
 
-import os
-from dotenv import load_dotenv
-
-from .skb import SKB, SKBSchema, SKBNode, Neo4jSKB, ChromaSKB
+from .skb import SKB, SKBSchema, SKBNode
 
 class BarrickSchema(SKBSchema):
     class Source(SKBNode):
@@ -99,53 +96,3 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
             skb.add_entity(fm)
 
     return skb
-
-# ----------------- Processing space ------------------
-
-SOURCE_CSV = "fmea_barrick_filled.csv"
-STORE_PKL = "skb.pkl"
-DEBUG_PKL = "skb_debug.pkl"
-STORE_FAISS = "skb_faiss"
-DEBUG_FAISS = "skb_debug_faiss"
-STORE_CHROMA = "skb_chroma"
-
-load_dotenv()
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
-
-## Print nicely formatted schema
-# print(BarrickSchema.schema_to_jsonlike_str())
-
-## Load from CSV
-# skb = SKB(BarrickSchema)
-# load_from_barrick_csv(skb, SOURCE_CSV, 5)
-# entities = skb.get_entities()
-
-## Save to PKL
-# skb.save_pickle(DEBUG_PKL)
-
-## Load from PKL
-# skb_loaded = SKB(BarrickSchema)
-# skb_loaded.load_pickle(STORE_PKL)
-# entities_loaded = skb_loaded.get_entities()
-
-### Neo4j
-## Parse to Neo4j
-# neo4j_parser = Neo4jSKB(NEO4J_URI, NEO4J_AUTH)
-# neo4j_parser.parse(skb_loaded)
-
-### Chroma
-## Parse to Chroma and query
-# chroma_parser = ChromaSKB(persist_directory=STORE_CHROMA)
-# chroma_parser.nuke()
-# chroma_parser.parse(skb_loaded)
-# results = chroma_parser.similarity_search("temperature", k=25, filter_entity="FailureEffect")
-# print(*results, sep="\n")
-
-## Load from Chroma and query
-# chroma_loaded = ChromaSKB(persist_directory=STORE_CHROMA)
-# chroma_loaded.load()
-# results = chroma_loaded.similarity_search("temperature issues", k=15, filter_entity="FailureEffect")
-# print(*results, sep="\n")
-
-

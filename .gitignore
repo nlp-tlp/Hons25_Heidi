@@ -182,11 +182,9 @@ logs/
 .vscode/
 
 
-# SKB data
+# DBs
 skb.pkl
-skb_debug.pkl
+chroma/
 
-skb_chroma
-skb_debug_chroma
-skb_faiss
-skb_debug_faiss
+# Experimental
+experimental/

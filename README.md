@@ -1,58 +1,17 @@
 # Honours - Heidi Leow
 
-## Run app demo
+Common commands have been put into a makefile. In the root directory, use `make help` to see a list of the commands and their descriptions.
 
-Run streamlit app for chat interface:
+## Loading
 
-```
-cd app
-streamlit run Chat_Planner.py
-```
+🚧 _Currently manually done_ 🚧
 
-## Experimentation setup
+## Demo
 
-### GraphRAG
+### Streamlit interface
 
-Note that the prompts directory is the default on initialisation by the package. See https://microsoft.github.io/graphrag/get_started/ for more details
+A Streamlit chat interface is available for both the current RAG strategies and vector search collections. To see the demo, run `make run_app`.
 
-#### Indexing to KG
+#### Issues
 
-```
-cd experimental/graphrag
-graphrag index --root .
-```
-
-#### Querying
-
-Local search for more specific questions:
-
-```
-cd experimental/graphrag
-graphrag query \
---root . \
---method local \
---query "Which subcomponent of Power unit has an RPN of 27."
-```
-
-Global search for more high-level questions:
-
-```
-cd experimental/graphrag
-graphrag query \
---root . \
---method global \
---query "What components have an RPN value over 40"
-```
-
-### Text-to-Cypher
-
-#### Creating KG
-
-Make sure that a Neo4j instance has separately been set up. Retrieve your username and the password for that instance, and replace it in the .env file.
-
-#### Querying
-
-```
-cd experimental/text_to_cypher
-python3 text_to_cypher.py "What is the average detection value over the full dataset?"
-```
+Using Streamlit and pyTorch (used in Flair embeddings) together throws an error when the Streamlit interface is first run. This does not impact any operations. The fix unmerged in https://github.com/streamlit/streamlit/pull/10388; adding the proposed code stops it from coming up in terminal.

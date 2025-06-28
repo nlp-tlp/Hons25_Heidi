@@ -1,30 +1,9 @@
-from neo4j import GraphDatabase
-
 import logging
 import re
 
-import os
-import sys
-SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(SRC_PATH)
-
-from pipeline.llm import ChatClient
-from loader.skb_barrick import BarrickSchema
-from loader.skb import Neo4jSKB
-
-# Config - change as necessary
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="\n=== %(levelname)s [%(name)s] ===\n%(message)s\n"
-)
-logger = logging.getLogger("TextToCypher")
+from llm import ChatClient
+from databases import BarrickSchema
+from databases import Neo4j_SKB
 
 # Prompts
 schema_context = BarrickSchema.schema_to_jsonlike_str()
@@ -51,26 +30,28 @@ Answer this question using the following already retrieved context. Assume these
 # Retriever
 class TextToCypherRetriever:
     def __init__(self, client: ChatClient):
-        self.neo4j_module = Neo4jSKB(uri=NEO4J_URI, auth=NEO4J_AUTH)
+        self.logger = logging.getLogger(self.__class__.__name__)
+
         self.client = client
+        self.neo4j_skb = Neo4j_SKB()
 
     def retrieve(self, question: str | None):
         if question is None:
-            logger.info("No question given, terminating")
+            self.logger.info("No question given, terminating")
             return
-        logger.info(f"Question given: {question}")
+        self.logger.info(f"Question given: {question}")
 
         # Get generated Cypher
         query = self.generate_cypher(question)
-        logger.info(f"Generated Cypher: {query}")
+        self.logger.info(f"Generated Cypher: {query}")
 
         # Run command
         try:
-            records = self.neo4j_module.query(query)
-            logger.info(f"Retrieved {len(records)} records from Neo4j.")
+            records = self.neo4j_skb.query(query)
+            self.logger.info(f"Retrieved {len(records)} records from Neo4j.")
             return query, self.remove_ids(records), None
         except Exception as e:
-            logger.error(f"Error running Cypher: {e}")
+            self.logger.error(f"Error running Cypher: {e}")
             return query, [], f"Error during Cypher execution: {e}"
 
     def generate_cypher(self, question: str):
@@ -79,7 +60,7 @@ class TextToCypherRetriever:
             schema=schema_context,
             question=question
         )
-        logger.debug(f"Prompting LLM using: {prompt}")
+        self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate Cypher from LLM
         raw_response = self.client.chat(prompt=prompt)
@@ -92,15 +73,3 @@ class TextToCypherRetriever:
                 if isinstance(value, dict) and "external_id" in value:
                     del value["external_id"]
         return records
-
-# Example usage
-# from ..final_generator import FinalGenerator
-
-# example_question = "What components have an RPN value over 35"
-# retriever = TextToCypherRetriever(model="gpt-4o")
-# retrieved_records = retriever.retrieve(question=example_question)
-
-# generator = FinalGenerator(model="gpt-4o")
-# final_response = generator.generate(question=example_question, retrieved_nodes=retrieved_records)
-
-# logger.info(f"Final response: {final_response}")
