@@ -51,33 +51,33 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
             if max_rows is not None and i >= max_rows:
                 break
 
-            source = BarrickSchema.Source(spreadsheet=row["Spreadsheet"], index=i)
+            source = BarrickSchema.Source(spreadsheet=row["Spreadsheet"].strip(), index=i)
             source_id = skb.add_entity(source)
 
-            subsystem = BarrickSchema.Subsystem(name=row["Subsystem"])
+            subsystem = BarrickSchema.Subsystem(name=row["Subsystem"].strip())
             subsystem_id = skb.add_entity(subsystem)
 
-            component = BarrickSchema.Component(in_subsystem=[subsystem_id], name=row["Component"])
+            component = BarrickSchema.Component(in_subsystem=[subsystem_id], name=row["Component"].strip())
             component_id = skb.add_entity(component)
             skb.get_entity_by_id(subsystem_id)._rev_in_subsystem = component_id
 
-            subcomponent = BarrickSchema.SubComponent(in_component=[component_id], name=row["Sub-Component"])
+            subcomponent = BarrickSchema.SubComponent(in_component=[component_id], name=row["Sub-Component"].strip())
             subcomponent_id = skb.add_entity(subcomponent)
 
-            fe = BarrickSchema.FailureEffect(description=row["Potential Effect(s) of Failure"])
+            fe = BarrickSchema.FailureEffect(description=row["Potential Effect(s) of Failure"].strip())
             fe_id = skb.add_entity(fe)
 
-            fc = BarrickSchema.FailureCause(description=row["Potential Cause(s) of Failure"])
+            fc = BarrickSchema.FailureCause(description=row["Potential Cause(s) of Failure"].strip())
             fc_id = skb.add_entity(fc)
 
             controls_str = row["Current Controls"]
             if controls_str:
-                controls = BarrickSchema.CurrentControls(description=controls_str)
+                controls = BarrickSchema.CurrentControls(description=controls_str.strip())
                 controls_id = skb.add_entity(controls)
 
             recommended_str = row["Recommended Action"]
             if recommended_str:
-                recommended = BarrickSchema.RecommendedAction(description=recommended_str)
+                recommended = BarrickSchema.RecommendedAction(description=recommended_str.strip())
                 recommended_id = skb.add_entity(recommended)
 
             fm = BarrickSchema.FailureMode(
@@ -87,7 +87,7 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
                 has_failure_cause=[fc_id],
                 has_recommended_action=[recommended_id] if recommended_id else [],
                 has_current_controls=[controls_id] if controls_id else [],
-                description=row["Potential Failure Mode"],
+                description=row["Potential Failure Mode"].strip(),
                 occurrence=int(row["Occurrence"]),
                 detection=int(row["Detection"]),
                 rpn=int(row["RPN"]),

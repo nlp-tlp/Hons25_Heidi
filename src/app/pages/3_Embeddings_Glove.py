@@ -51,7 +51,11 @@ role_to_icon = {
     "assistant": ":material/list:"
 }
 
-for entry in st.session_state.embeddings_history_glove:
+@st.cache_data
+def df_to_csv(df: pd.DataFrame):
+    return df.to_csv().encode("utf-8")
+
+for i, entry in enumerate(st.session_state.embeddings_history_glove):
     with st.chat_message(entry["role"], avatar=role_to_icon[entry["role"]]):
         if "config" in entry:
             st.markdown(f"**Configuration:** K: `{entry["config"]["k"]}` | Threshold: `{entry["config"]["threshold"]}`")
@@ -59,7 +63,16 @@ for entry in st.session_state.embeddings_history_glove:
         if entry["role"] == "user":
             st.markdown(entry["search"])
         else:
-            st.table(entry["results"])
+            df = entry["results"]
+            st.table(df)
+            st.download_button(
+                key=i,
+                label="Download as CSV",
+                data=df_to_csv(df),
+                file_name="glove.csv",
+                mime="text/csv",
+                icon=":material/download:"
+            )
 
 # User input
 search = st.chat_input("Enter a search term or passage...")
@@ -81,8 +94,14 @@ if search:
                 threshold=st.session_state.embeddings_sentence_threshold
             )
 
-            results = pd.DataFrame(([record[1], "  \n".join(textwrap.wrap(record[2], width=100)), "{:.4f}".format(record[3])] for record in records),
-            columns=["Type", "Content", "Score"])
+            results = pd.DataFrame(
+                ([record[1], record[2].replace(" ", "\u00A0"), "{:.4f}".format(record[3])] for record in records),
+                columns=["Type", "Content", "Score"]
+            )
+
+            # Resolves duplicates here - TODO: Not the best way - inefficient and doesn't return same number as set 'K'
+            # There being duplicates in the first place might indicate a problem with the way I am structuring data
+            results = results.drop_duplicates(subset=None, keep="first", inplace=False).reset_index(drop=True)
 
     st.session_state.embeddings_history_glove.append({"role": "user", "search": search})
     st.session_state.embeddings_history_glove.append({"role": "assistant", "results": results, "config": config_snapshot})

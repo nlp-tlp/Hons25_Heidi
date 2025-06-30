@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 import logging
 import shutil
-import numpy as np
 
 from chromadb import Collection, QueryResult, Documents, PersistentClient
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction, EmbeddingFunction
@@ -60,6 +59,8 @@ class Chroma_DB:
             metadata={"hnsw:space": "cosine"}
         )
 
+        self.logger.info(f"Collection {self.collection_name} loaded with size {self.collection.count()}")
+
     def query(self, query: str, k: int = 25, threshold: float = None, filter_entity: str = None, filter_ids: list[str] = None):
         params = {}
         if filter_entity:
@@ -68,7 +69,7 @@ class Chroma_DB:
             params["ids"] = filter_ids
 
         query_result: QueryResult = self.collection.query(
-            query_texts=[query],
+            query_texts=[query.lower()],
             n_results=k,
             **params
         )
@@ -111,11 +112,13 @@ class Chroma_DB:
             docs_meta.append(meta)
             docs_ids.append(node_id)
 
-        self.collection.upsert(
+        self.collection.add(
             documents=docs,
             metadatas=docs_meta,
             ids=docs_ids
         )
+
+        self.logger.info(f"New collection size: {self.collection.count()}")
 
 class Te3s_SKB(Chroma_DB):
     def __init__(self):
@@ -166,6 +169,7 @@ class Flair_SKB(Chroma_DB):
     class FlairEmbeddingFunction(EmbeddingFunction[Documents]):
         def __init__(self):
             stacked_flair_embedding = StackedEmbeddings([
+                WordEmbeddings("glove"),
                 FlairEmbeddings("news-forward"),
                 FlairEmbeddings("news-backward")
             ])
