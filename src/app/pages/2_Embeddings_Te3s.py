@@ -53,6 +53,7 @@ role_to_icon = {
 
 @st.cache_data
 def df_to_csv(df: pd.DataFrame):
+    df["Content"] = df["Content"].astype(str).str.replace('\u00A0', ' ', regex=False)
     return df.to_csv().encode("utf-8")
 
 for i, entry in enumerate(st.session_state.embeddings_history_te3s):
@@ -88,7 +89,7 @@ if search:
             }
 
             records = embeddings_search(
-                search=search,
+                search=search.strip(),
                 embeddings_type="text-embedding-3-small",
                 k=st.session_state.embeddings_sentence_k,
                 threshold=st.session_state.embeddings_sentence_threshold
