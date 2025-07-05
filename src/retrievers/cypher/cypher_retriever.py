@@ -5,35 +5,19 @@ from llm import ChatClient
 from databases import BarrickSchema
 from databases import Neo4j_SKB
 
-# Prompts
-schema_context = BarrickSchema.schema_to_jsonlike_str()
-
-text_to_cypher_prompt = """You are a system that converts natural language questions into Cypher queries.
-Use the following schema to understand the Neo4j graph:
-
-{schema}
-
-The question you should convert is:
-
-{question}
-
-Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response."""
-
-final_generator_prompt = """You are the final generator in a RAG system. The user question that has to be answered is:
-
-{question}
-
-Answer this question using the following already retrieved context. Assume these are already the right answers to the question, and simply need to be put into natural language. If no records are provided in the context, do not guess and simply say so:
-
-{records}"""
+PROMPT_PATH = "t2c_prompt.txt"
+SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
 
 # Retriever
 class TextToCypherRetriever:
-    def __init__(self, client: ChatClient):
+    def __init__(self, client: ChatClient, prompt_path: str = PROMPT_PATH):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.client = client
         self.neo4j_skb = Neo4j_SKB()
+
+        with open(prompt_path) as f:
+            self.prompt = f.read()
 
     def retrieve(self, question: str | None):
         if question is None:
@@ -56,8 +40,8 @@ class TextToCypherRetriever:
 
     def generate_cypher(self, question: str):
         # Build prompt
-        prompt = text_to_cypher_prompt.format(
-            schema=schema_context,
+        prompt = self.prompt.format(
+            schema=SCHEMA_CONTEXT,
             question=question
         )
         self.logger.info(f"Prompting LLM using: {prompt}")

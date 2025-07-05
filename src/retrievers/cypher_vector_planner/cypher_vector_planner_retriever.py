@@ -7,7 +7,10 @@ import re
 from llm import ChatClient
 from databases import BarrickSchema, Neo4j_SKB, Chroma_DB
 
-# Prompts and schemas
+PROMPT_PATH = "cypher_planner_prompt.txt"
+SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
+
+# Schema constraints
 class KGStep(BaseModel):
     type: Literal["kg"]
     query: str
@@ -22,56 +25,18 @@ class ReasoningMixin:
 class Plan(BaseModel, ReasoningMixin):
     steps: list[KGStep | VectorStep]
 
-schema_context = BarrickSchema.schema_to_jsonlike_str()
-
-planning_prompt = """You are a system that decomposes natural language questions into sequential retrieval steps over a semi-structured graph-based knowledge base. There are two types of retrieval steps:
-1. **"kg" (structured query)** - Cypher queries over the Neo4j graph using the provided schema.
-2. **"vector" (semantic search)** - Embedding-based similarity search over properties of nodes marked with `@match_semantically`.
-
-Decompose the given question into a sequence of retrieval steps. Each step should help narrow down relevant nodes or answer subparts of the question. A single step is sufficient if the question is simple. Use the following JSON format exactly:
-
-{{
-    "steps": [
-        {{"type": "kg", "query": "<Cypher query string>"}},
-        {{"type": "vector", "search": "<semantic search string>"}},
-        ...
-    ],
-    "reasoning": "<your thought process here>"
-}}
-
----
-
-You are provided the following graph schema and node metadata:
-
-{schema}
-
-The question you should convert is:
-
-{question}
-
----
-
-Planning rules:
-1. Only decompose the question if necessary. Many simple questions require a single step.
-2. After a non-final Cypher step, you must end the query with: `RETURN DISTINCT <alias>.external_id AS id`. This tells the system which nodes to use in the next step.
-3. Any Cypher step that is not the first step must use the `n` variable in the MATCH statement. This is the set of full nodes returned from the last step, and should be used like a normal node type in the format (n:Type). Do not manually write Cypher constraints on ids like `WHERE id IN ...`
-4. After a final Cypher step, explicitly return named properties e.g. `RETURN n.name, n.age` rather than returning nodes. The final step should return all properties that would be considered valuable in an informative response to the question. Properties from previous steps should be re-retrived if necessary.
-5. Any Cypher step before a vector search step must return a node type with the property tagged `@match_semantically`, for which you want to perform the vector search on. Vector search steps take the nodes returned by the last step and returns a filtered down pool.
-6. Do not assume that names in the query will be exactly the same as they are in the database. It is possible that there are different capitalisations, or the user only knows a part of the name, and this has to be accounted for in Cypher queries.
-7. Do not use $ variables or assume prior definitions not in the prompt.
-8. Do not perform vector searches on entity types that do not have a property tagged `@match_semantically`. Not all string-type properties have a vector embedding.
-"""
-
 # Individual strategies
 class PlannerRetriever:
-    def __init__(self, client: ChatClient, embedder: Chroma_DB):
+    def __init__(self, client: ChatClient, embedder: Chroma_DB, prompt_path: str = PROMPT_PATH):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.client = client
         self.neo4j_skb = Neo4j_SKB()
         self.chroma_skb = embedder
-
         self.working_node_ids = []
+
+        with open(prompt_path) as f:
+            self.prompt = f.read()
 
     def retrieve(self, question: str | None):
         if question is None:
@@ -118,8 +83,8 @@ class PlannerRetriever:
 
     def generate_plan(self, question: str):
         # Build prompt
-        prompt = planning_prompt.format(
-            schema=schema_context,
+        prompt = self.prompt.format(
+            schema=SCHEMA_CONTEXT,
             question=question
         )
         self.logger.debug(f"Prompting LLM using: {prompt}")
