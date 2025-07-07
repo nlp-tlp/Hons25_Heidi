@@ -11,11 +11,10 @@ class ChatClient:
     @param temperature: The randomness of the model. Between 0.0 and 1.0.
     """
 
-    def __init__(self, provider: str = "ollama", model: str = "llama3.2", temperature: float = 0.0):
+    def __init__(self, provider: str = "ollama", model: str = "llama3.2"):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.provider = provider
         self.model = model
-        self.temperature = temperature
 
         if provider == "ollama":
             import ollama
@@ -55,7 +54,6 @@ class ChatClient:
             response = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
                 **({"response_format": response_format} if response_format is not None else {})
             )
             return response.choices[0].message.content.strip()

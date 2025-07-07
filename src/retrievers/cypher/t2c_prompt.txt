@@ -9,3 +9,7 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 ### Question to convert
 
 {question}
+
+### Rules
+
+1. Any text property matches must be done with apoc.text.fuzzyMatch().

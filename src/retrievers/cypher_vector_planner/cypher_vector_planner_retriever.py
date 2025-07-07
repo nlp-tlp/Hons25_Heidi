@@ -7,7 +7,7 @@ import re
 from llm import ChatClient
 from databases import BarrickSchema, Neo4j_SKB, Chroma_DB
 
-PROMPT_PATH = "cypher_planner_prompt.txt"
+PROMPT_PATH = "retrievers/cypher_vector_planner/cypher_planner_prompt.txt"
 SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
 
 # Schema constraints

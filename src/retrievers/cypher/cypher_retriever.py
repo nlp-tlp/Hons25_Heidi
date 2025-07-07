@@ -5,7 +5,7 @@ from llm import ChatClient
 from databases import BarrickSchema
 from databases import Neo4j_SKB
 
-PROMPT_PATH = "t2c_prompt.txt"
+PROMPT_PATH = "retrievers/cypher/t2c_prompt.txt"
 SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
 
 # Retriever
@@ -19,14 +19,14 @@ class TextToCypherRetriever:
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def retrieve(self, question: str | None):
+    def retrieve(self, question: str | None, extra_context: str = ""):
         if question is None:
             self.logger.info("No question given, terminating")
             return
         self.logger.info(f"Question given: {question}")
 
         # Get generated Cypher
-        query = self.generate_cypher(question)
+        query = self.generate_cypher(question, extra_context=extra_context)
         self.logger.info(f"Generated Cypher: {query}")
 
         # Run command
@@ -38,12 +38,12 @@ class TextToCypherRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return query, [], f"Error during Cypher execution: {e}"
 
-    def generate_cypher(self, question: str):
+    def generate_cypher(self, question: str, extra_context: str = ""):
         # Build prompt
         prompt = self.prompt.format(
             schema=SCHEMA_CONTEXT,
             question=question
-        )
+        ) + extra_context
         self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate Cypher from LLM
