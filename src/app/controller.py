@@ -53,6 +53,8 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
             response = final_generator.generate(question=question, retrieved_nodes=results)
             return cypher_query, results, response, None
         case "planning_routing":
+            extra_context = linker.get_linked_context(question=question)
+
             planning_routing_retriever = PlannerRetriever(client=chat_models[retriever_model], embedder=embedders[embedder])
             plan, last_results, error = planning_routing_retriever.retrieve(question=question)
             if error:

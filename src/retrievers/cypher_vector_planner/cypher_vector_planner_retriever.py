@@ -38,14 +38,14 @@ class PlannerRetriever:
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def retrieve(self, question: str | None):
+    def retrieve(self, question: str | None, extra_context: str = ""):
         if question is None:
             self.logger.info("No question given, terminating")
             return
         self.logger.info(f"Question given: {question}")
 
         # Generate plan
-        plan_text = self.generate_plan(question)
+        plan_text = self.generate_plan(question, extra_context=extra_context)
 
         try:
             plan = json.loads(plan_text)
@@ -81,12 +81,12 @@ class PlannerRetriever:
             self.logger.error(f"Error during retrieval: {e}")
             return plan, [], f"Error during plan execution: {e}"
 
-    def generate_plan(self, question: str):
+    def generate_plan(self, question: str, extra_context: str = ""):
         # Build prompt
         prompt = self.prompt.format(
             schema=SCHEMA_CONTEXT,
             question=question
-        )
+        ) + extra_context
         self.logger.debug(f"Prompting LLM using: {prompt}")
 
         # Generate plan and component queries from LLM
