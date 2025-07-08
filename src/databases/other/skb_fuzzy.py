@@ -1,5 +1,6 @@
 import logging
 import pickle
+import re
 from rapidfuzz import process, fuzz
 
 from ..pkl.skb import SKB
@@ -24,10 +25,19 @@ class Fuzzy_SKB:
             if not text_fields:
                 continue
 
-            text = " | ".join(v.lower() for v in text_fields.values())
+            text = " | ".join(self.normalise_string(v) for v in text_fields.values())
             self.texts.setdefault(text, set()).add(type(node).__name__)
 
         self.logger.info(f"New collection size: {len(self.texts)}")
+
+    def normalise_string(self, text: str):
+        if not text:
+            return ""
+
+        text = text.lower()
+        text = text.rstrip(".,") # Lots of entries that end with comma or dot point
+        text = re.sub(r'\s+', ' ', text) # Some entries have double whitespaces
+        return text
 
     def query(self, text, top_k=5, threshold=70, return_scores: bool = True):
         self.logger.info(f"Fuzzy and partial matching for '{text}'")

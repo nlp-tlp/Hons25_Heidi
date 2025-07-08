@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import shutil
+import re
 
 from chromadb import Collection, QueryResult, Documents, PersistentClient
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction, EmbeddingFunction
@@ -105,7 +106,7 @@ class Chroma_DB:
             if not semantic_fields:
                 continue
 
-            text = " | ".join(v.lower() for v in semantic_fields.values())
+            text = " | ".join(self.normalise_string(v) for v in semantic_fields.values())
             meta = {"type": type(node).__name__}
 
             docs.append(text)
@@ -119,6 +120,15 @@ class Chroma_DB:
         )
 
         self.logger.info(f"New collection size: {self.collection.count()}")
+
+    def normalise_string(self, text: str):
+        if not text:
+            return ""
+
+        text = text.lower()
+        text = text.rstrip(".,") # Lots of entries that end with comma or dot point
+        text = re.sub(r'\s+', ' ', text) # Some entries have double whitespaces
+        return text
 
 class Te3s_SKB(Chroma_DB):
     def __init__(self):

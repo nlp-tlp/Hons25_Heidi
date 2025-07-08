@@ -32,10 +32,7 @@ class Neo4j_DB:
         return f"MERGE (n:{entity_label} {{{prop_keys}}})"
 
     def template_insert_relation(self, from_label, rel_name, to_label):
-        return (
-            f"MATCH (a:{from_label} {{external_id: $from_id}}), (b:{to_label} {{external_id: $to_id}}) "
-            f"MERGE (a)-[r:{rel_name.upper()}]->(b)"
-        )
+        return f"MATCH (a:{from_label} {{external_id: $from_id}}) MATCH (b:{to_label} {{external_id: $to_id}}) MERGE (a)-[r:{rel_name.upper()}]->(b)"
 
 class Neo4j_SKB(Neo4j_DB):
     def parse(self, skb: SKB, max_entities: int = None, clear_previous: bool = True):
@@ -67,4 +64,3 @@ class Neo4j_SKB(Neo4j_DB):
                         to_label = to_node.__class__.__name__
                         query = self.template_insert_relation(from_label, rel_name, to_label)
                         session.run(query, {"from_id": node_id, "to_id": target_id})
-
