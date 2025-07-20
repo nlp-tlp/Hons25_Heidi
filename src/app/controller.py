@@ -5,6 +5,7 @@ from retrievers import TextToCypherRetriever, PlannerRetriever
 from generators import FinalGenerator
 from llm import ChatClient
 from databases import embedder_factory
+from linking import EntityLinker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,6 +29,8 @@ with open(CONFIG_PATH) as f:
         name = embedder["name"]
         embedders[name] = embedder_factory(name=name)
 
+linker = EntityLinker(client=ChatClient(provider="openai", model="gpt-4.1-mini-2025-04-14"))
+
 def get_chat_model_names():
     return list(chat_models.keys())
 
@@ -35,12 +38,17 @@ def get_embedder_names():
     return list(embedders.keys())
 
 def rag_query(question: str, strategy: str = "text_to_cypher",
-    retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedder: str = "text-embedding-3-small") -> str:
+    retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedder: str = "text-embedding-3-small", use_linking: bool = True) -> str:
 
     match strategy:
         case "text_to_cypher":
-            text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model])
-            cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question)
+            extra_context = linker.get_linked_context(question=question) if use_linking else ""
+
+            if use_linking:
+                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model])
+            else:
+                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/t2c_prompt_no_entities.txt")
+            cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context)
             if error:
                 return cypher_query, results, "Error has occurred.", error
 
@@ -48,6 +56,8 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
             response = final_generator.generate(question=question, retrieved_nodes=results)
             return cypher_query, results, response, None
         case "planning_routing":
+            extra_context = linker.get_linked_context(question=question)
+
             planning_routing_retriever = PlannerRetriever(client=chat_models[retriever_model], embedder=embedders[embedder])
             plan, last_results, error = planning_routing_retriever.retrieve(question=question)
             if error:

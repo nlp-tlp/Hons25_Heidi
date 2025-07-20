@@ -52,6 +52,10 @@ class SKBNode(BaseModel):
         return { k: v for k, v in self.model_dump().items()
             if self.model_fields[k].json_schema_extra.get("semantic", False)}
 
+    def get_textual(self) -> dict[str, any]:
+        return { k: v for k, v in self.model_dump().items()
+            if isinstance(v, str)}
+
     def compute_id(self) -> str:
         id_vals = self.get_identity().values()
         return hashlib.sha1("|".join(str(val) for val in id_vals).encode()).hexdigest()

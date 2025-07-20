@@ -183,7 +183,7 @@ logs/
 
 
 # DBs
-skb.pkl
+*.pkl
 chroma/
 
 # Experimental

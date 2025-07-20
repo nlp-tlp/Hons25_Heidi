@@ -1,6 +1,6 @@
 import logging
 
-from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, SKB, BarrickSchema, load_from_barrick_csv
+from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, Fuzzy_SKB, SKB, BarrickSchema, load_from_barrick_csv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,3 +39,11 @@ def load_flair_skb():
 
     flair_skb = Flair_SKB()
     flair_skb.parse(skb_loaded)
+
+def load_fuzzy_skb():
+    skb_loaded = SKB(BarrickSchema)
+    skb_loaded.load_pickle("databases/pkl/skb.pkl")
+
+    fuzzy_skb = Fuzzy_SKB()
+    fuzzy_skb.parse(skb_loaded)
+    fuzzy_skb.save_pickle("databases/other/fuzzy_types.pkl")

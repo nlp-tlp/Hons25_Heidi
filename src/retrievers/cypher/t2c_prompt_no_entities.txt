@@ -13,3 +13,4 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 ### Rules
 
 1. Any text property matches must be done with apoc.text.fuzzyMatch().
+2. If any entity types are unclear, use non-specific nodes that seem to be the best match. Nodes of similar types already possess the same properties.

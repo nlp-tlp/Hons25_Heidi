@@ -12,20 +12,18 @@ class BarrickSchema(SKBSchema):
         name: str = Field(..., id=True)
 
     class Component(SKBNode):
-        in_subsystem: list[str] = Field(..., id=True, relation=True, dest='Subsystem')
+        part_of: list[str] = Field(..., id=True, relation=True, dest='Subsystem')
         name: str = Field(..., id=True)
 
     class SubComponent(SKBNode):
-        in_component: list[str] = Field(..., id=True, relation=True, dest='Component')
+        part_of: list[str] = Field(..., id=True, relation=True, dest='Component')
         name: str = Field(..., id=True)
 
     class FailureMode(SKBNode):
         in_source: list[str] = Field(..., relation=True, dest='Source')
-        in_sub_component: list[str] = Field(..., id=True, relation=True, dest='SubComponent')
-        has_failure_effect: list[str] = Field(..., relation=True, dest='FailureEffect')
-        has_failure_cause: list[str] = Field(..., relation=True, dest='FailureCause')
-        has_recommended_action: list[str] = Field(..., relation=True, dest='RecommendedAction')
-        has_current_controls: list[str] = Field(..., relation=True, dest='CurrentControls')
+        for_part: list[str] = Field(..., id=True, relation=True, dest='SubComponent, Component, Subsystem')
+        related_to: list[str] = Field(..., relation=True, dest='FailureCause, FailureEffect')
+        has_action: list[str] = Field(..., relation=True, dest='CurrentControls, RecommendedAction')
         description: str = Field(..., id=True, semantic=True)
         occurrence: int = Field(..., id=True)
         detection: int = Field(..., id=True)
@@ -57,11 +55,11 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
             subsystem = BarrickSchema.Subsystem(name=row["Subsystem"].strip())
             subsystem_id = skb.add_entity(subsystem)
 
-            component = BarrickSchema.Component(in_subsystem=[subsystem_id], name=row["Component"].strip())
+            component = BarrickSchema.Component(part_of=[subsystem_id], name=row["Component"].strip())
             component_id = skb.add_entity(component)
             skb.get_entity_by_id(subsystem_id)._rev_in_subsystem = component_id
 
-            subcomponent = BarrickSchema.SubComponent(in_component=[component_id], name=row["Sub-Component"].strip())
+            subcomponent = BarrickSchema.SubComponent(part_of=[component_id], name=row["Sub-Component"].strip())
             subcomponent_id = skb.add_entity(subcomponent)
 
             fe = BarrickSchema.FailureEffect(description=row["Potential Effect(s) of Failure"].strip())
@@ -70,23 +68,24 @@ def load_from_barrick_csv(skb: SKB, filepath: str, max_rows: int = None):
             fc = BarrickSchema.FailureCause(description=row["Potential Cause(s) of Failure"].strip())
             fc_id = skb.add_entity(fc)
 
+            actions = []
             controls_str = row["Current Controls"]
             if controls_str:
                 controls = BarrickSchema.CurrentControls(description=controls_str.strip())
                 controls_id = skb.add_entity(controls)
+                actions.append(controls_id)
 
             recommended_str = row["Recommended Action"]
             if recommended_str:
                 recommended = BarrickSchema.RecommendedAction(description=recommended_str.strip())
                 recommended_id = skb.add_entity(recommended)
+                actions.append(recommended_id)
 
             fm = BarrickSchema.FailureMode(
                 in_source=[source_id],
-                in_sub_component=[subcomponent_id],
-                has_failure_effect=[fe_id],
-                has_failure_cause=[fc_id],
-                has_recommended_action=[recommended_id] if recommended_id else [],
-                has_current_controls=[controls_id] if controls_id else [],
+                for_part=[subcomponent_id],
+                related_to=[fe_id, fc_id],
+                has_action=actions,
                 description=row["Potential Failure Mode"].strip(),
                 occurrence=int(row["Occurrence"]),
                 detection=int(row["Detection"]),

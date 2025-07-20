@@ -4,25 +4,17 @@ from llm import ChatClient
 from databases import BarrickSchema
 
 # Prompts
-schema_context = BarrickSchema.schema_to_jsonlike_str()
-
-final_generator_prompt = """You are the final generator in a RAG system. The user question that has to be answered is:
-
-{question}
-
-Answer this question using the following already retrieved context. Speak directly to the user who asked the question and if speaking of the retrieved records, pretend like you were the one that performed the retrieval directly. You may have to infer the names of certain terms (e.g. 'fm' may represent 'failure mode'). If no records are provided in the context, do not guess and simply say so. If you think some information is missing, just assume that the retrieved information is the correct set to answer the question, but mention this in your response:
-
-{records}
-
-Here is some context on the way the data was stored that might be of use:
-
-{schema}"""
+PROMPT_PATH = "generators/generator_prompt.txt"
+SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
 
 # Generator
 class FinalGenerator:
-    def __init__(self, client: ChatClient):
+    def __init__(self, client: ChatClient, prompt_path: str = PROMPT_PATH):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = client
+
+        with open(prompt_path) as f:
+            self.prompt = f.read()
 
     def generate(self, question: str, retrieved_nodes: list[dict]):
         # Cases to use prewritten answers
@@ -36,10 +28,10 @@ class FinalGenerator:
 
         # Build prompt
         context_string = "\n".join([str(r) for r in retrieved_nodes]) if retrieved_nodes else "No relevant records found."
-        prompt = final_generator_prompt.format(
+        prompt = self.prompt.format(
             question=question,
             records=context_string,
-            schema=schema_context
+            schema=SCHEMA_CONTEXT
         )
         self.logger.debug(f"Prompting LLM using: {prompt}")
 
