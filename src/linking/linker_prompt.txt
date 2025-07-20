@@ -11,14 +11,14 @@ Ignore any names that is simply referring to an entity or property type. Do not 
 - Existing entities: Subsystem, Component, SubComponent, FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls.
 - Existing properties: Spreadsheet, Name, Description, Occurrence, Detection, RPN, Severity.
 
-Entities may consist of one or more words. Do not try to guess their specific type, just extract the most complete and meaningful phrases that could be matched to a knowledge base entry. The goal is to cover as many reasonable candidates as possible. These may be overlapping.
+Entities may consist of one or more words. Do not try to guess their specific type, just extract the most complete and meaningful phrases that could be matched to a knowledge base entry.
 
 Format your output as a list of strings exactly. Do not output anything else. If there are no applicable entities, return an empty list and do not try to add to the list.
 
 ### Example
 
 Phrase: "What is the effect of leaks on the transmission hydraulics?"
-Output: ["leaks", "transmission", "hydraulics", "transmission hydraulics"]
+Output: ["leaks", "transmission hydraulics"]
 
 ### Phrase to extract
 
