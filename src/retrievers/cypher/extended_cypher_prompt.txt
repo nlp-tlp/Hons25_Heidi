@@ -1,0 +1,19 @@
+### Task
+
+Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
+
+### Neo4j graph schema
+
+{schema}
+
+### Extended functions
+
+Aside from existing Cypher functions and syntax, make use the additional functions below where necessary. Any text property matches must be done with these functions in WHERE clauses, instead of typical exact matches.
+
+1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for fitering string fields that do not have the @match_semantically tag.
+2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
+
+### Rules
+
+1. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed on the Cypher query.
+2. Do not return node objects. Instead, return entity properties or aggregation aliases.

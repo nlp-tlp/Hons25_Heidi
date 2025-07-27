@@ -47,3 +47,10 @@ def load_fuzzy_skb():
     fuzzy_skb = Fuzzy_SKB()
     fuzzy_skb.parse(skb_loaded)
     fuzzy_skb.save_pickle("databases/other/fuzzy_types.pkl")
+
+def attach_chroma_embeddings_to_neo4j():
+    te3s_skb = Te3s_SKB()
+    neo4j_skb = Neo4j_SKB()
+
+    neo4j_skb.attach_chroma_embeddings(te3s_skb)
+

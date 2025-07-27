@@ -53,7 +53,7 @@ class EntityLinker:
 
         prompt = f"""\n### Entity candidates
 
-Here are some already fuzzy matched entities from the knowledge base, from some mentions in the question. You may pick which ones to use, as they are not always relevant. There may be a single match that is best.
+Here are some already fuzzy matched entities from the knowledge base, from some mentions in the question. Pick which ones to use, as they are not always relevant. There may be a single match that is best.
 
 {"\n".join(str(m) for m in matches)}"""
 

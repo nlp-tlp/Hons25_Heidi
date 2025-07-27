@@ -5,6 +5,7 @@ import logging
 import neo4j
 
 from ..pkl.skb import SKB
+from ..chroma_dbs.skb_chroma import Chroma_DB
 
 load_dotenv()
 NEO4J_URI = os.getenv("NEO4J_URI")
@@ -15,12 +16,16 @@ class Neo4j_DB:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.driver = neo4j.GraphDatabase.driver(uri=NEO4J_URI, auth=NEO4J_AUTH)
 
-    def query(self, query: str, filter_ids: list[str] = None):
+    def query(self, query: str, filter_ids: list[str] = None, other_params: dict[str, any] = None):
         with self.driver.session() as session:
+            params = {}
             if filter_ids:
-                result = session.run(query, **{"ids": filter_ids})
-            else:
-                result = session.run(query)
+                params["ids"] = filter_ids
+            if other_params:
+                params = {**params, **other_params}  # Merge filter_ids params with other_params
+
+            # Execute the query with the merged parameters
+            result = session.run(query, **params)
             return [record.data() for record in result]
 
     def clear(self):
@@ -64,3 +69,41 @@ class Neo4j_SKB(Neo4j_DB):
                         to_label = to_node.__class__.__name__
                         query = self.template_insert_relation(from_label, rel_name, to_label)
                         session.run(query, {"from_id": node_id, "to_id": target_id})
+
+    def attach_chroma_embeddings(self, chromadb: Chroma_DB, max_rows: int = None):
+        self.logger.info(f"Retrieving embeddings from Chroma collection {chromadb.collection_name}")
+        if max_rows:
+            entries = chromadb.collection.get(limit=max_rows, include=["embeddings"])
+            self.logger.debug(f"Limited set of chroma entries: {entries}")
+        else:
+            entries = chromadb.collection.get(include=["embeddings"])
+
+        batch_data = [
+            {"id": id_val, "embedding": embedding}
+            for id_val, embedding in zip(entries["ids"], entries["embeddings"])
+        ]
+
+        cypher_query = f"""
+        UNWIND $batch as item
+        MATCH (n {{external_id: item.id}})
+        SET n.embedding = item.embedding
+        """
+
+        self.logger.info(f"Attaching embeddings from Chroma collection {chromadb.collection_name} to Neo4j database")
+        with self.driver.session() as session:
+            session.run(cypher_query, batch=batch_data)
+
+        self.logger.info(f"Finished attaching embeddings from Chroma collection {chromadb.collection_name} to Neo4j database")
+
+    def remove_embeddings(self):
+        cypher_query = f"""
+        MATCH (n)
+        WHERE n.embedding IS NOT NULL
+        REMOVE n.embedding
+        """
+
+        self.logger.info("Removing embeddings from Neo4j database")
+        with self.driver.session() as session:
+            session.run(cypher_query)
+
+        self.logger.info("Finished removing embeddings from Neo4j database")
