@@ -32,19 +32,8 @@ class TextToCypherRetriever:
         query = self.generate_cypher(question, extra_context=extra_context)
         self.logger.info(f"Generated Cypher: {query}")
 
-        # Process extended functions
-        params = None
-        if extended_cypher and self.embedding_client:
-            query, params = self.convert_extended_functions(query)
-
-        # Run command
-        try:
-            records = self.neo4j_skb.query(query, params)
-            self.logger.info(f"Retrieved {len(records)} records from Neo4j.")
-            return query, self.remove_ids(records), None
-        except Exception as e:
-            self.logger.error(f"Error running Cypher: {e}")
-            return query, [], f"Error during Cypher execution: {e}"
+        # Process extended functions and run command
+        return self.execute_query(query=query, extended_cypher=extended_cypher)
 
     def generate_cypher(self, question: str, extra_context: str = ""):
         # Build prompt
@@ -59,6 +48,18 @@ class TextToCypherRetriever:
         cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
 
+    def execute_query(self, query: str, extended_cypher: bool = True):
+        if extended_cypher and self.embedding_client:
+            query, params = self.convert_extended_functions(query)
+
+        try:
+            records = self.neo4j_skb.query(query, other_params=params)
+            self.logger.info(f"Retrieved {len(records)} records from Neo4j.")
+            return query, self.remove_ids(records), None
+        except Exception as e:
+            self.logger.error(f"Error running Cypher: {e}")
+            return query, [], f"Error during Cypher execution: {e}"
+
     def convert_extended_functions(self, query: str):
         # Fuzzy match replacement
         query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.fuzzyMatch(\1, \2)", query)
@@ -69,14 +70,18 @@ class TextToCypherRetriever:
             return query, None
 
         params = {}
-        for i, (search_phrase, target) in enumerate(match_params):
+        for i, (target, search_phrase) in enumerate(match_params):
             self.logger.info(f"Processing semantic match for: {search_phrase}")
             vector = self.embedding_client.embed(search_phrase.strip())
 
             vector_placeholder = f"vector_{i}"
-            query = query.replace(
-                f"IS_SEMANTIC_MATCH({search_phrase}, {target})",
-                f"vector.similarity.cosine(${vector_placeholder}, {target}) > 0.33"
+            similarity_var = f"similarity_{i}"
+            target_entity = target.split('.')[0]
+            query = re.sub( # TODO: Deal with OR clause
+                rf"(WHERE|AND)\s+IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)",
+                f"WITH *, vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}\n"
+                f"WHERE {similarity_var} > 0.33",
+                query
             )
             params[vector_placeholder] = vector
 

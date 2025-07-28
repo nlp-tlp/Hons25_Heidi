@@ -9,4 +9,4 @@ define find.functions
 endef
 
 run_app: ## Hosts streamlit chat interface
-	cd src && python3 -m streamlit run app/Chat_Planner.py
+	cd src && python3 -m streamlit run app/Chat_Text2ExtendedCypher.py

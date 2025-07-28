@@ -67,6 +67,7 @@ class EmbeddingClient:
     """
 
     def __init__(self, provider: str = "ollama", model: str = "mxbai-embed-large", dimensions: float | None = None):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.provider = provider
         self.model = model
         self.dimensions = dimensions

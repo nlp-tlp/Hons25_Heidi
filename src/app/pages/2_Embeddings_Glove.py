@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import textwrap
+# import textwrap
 
 from app.controller import embeddings_search
 

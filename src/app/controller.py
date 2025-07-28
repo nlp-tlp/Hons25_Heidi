@@ -22,8 +22,9 @@ with open(CONFIG_PATH) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
     for model in config["chat_models"]:
-        name, provider = model["name"], model["provider"]
-        chat_models[name] = ChatClient(provider=provider, model=name)
+        name = model.get("snapshot", model["name"])
+        provider = model["provider"]
+        chat_models[model["name"]] = ChatClient(provider=provider, model=name)
 
     for embedder in config["embedding_collections"]:
         name = embedder["name"]
@@ -45,7 +46,7 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
             extra_context = linker.get_linked_context(question=question) if use_linking else ""
 
             if strategy == "text_to_cypher_extended":
-                embedder = EmbeddingClient(provider="openai", model="text-3-embedding-small")
+                embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small")
                 text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/extended_cypher_prompt.txt", embedding_client=embedder)
                 cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context, extended_cypher=True)
             elif not use_linking:
@@ -81,3 +82,9 @@ def embeddings_search(search: str, embeddings_type: str = "text-embedding-3-smal
 
     embedder = embedders[embeddings_type]
     return embedder.query(search, k=k, threshold=threshold)
+
+embedder_te3s = EmbeddingClient(provider="openai", model="text-embedding-3-small")
+manual_t2ce = TextToCypherRetriever(client=None,  embedding_client=embedder_te3s)
+def manual_query(question: str):
+    query, results, errors = manual_t2ce.execute_query(query=question, extended_cypher=True)
+    return query, results, errors
