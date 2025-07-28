@@ -3,7 +3,7 @@ import yaml
 
 from retrievers import TextToCypherRetriever, PlannerRetriever
 from generators import FinalGenerator
-from llm import ChatClient
+from llm import ChatClient, EmbeddingClient
 from databases import embedder_factory
 from linking import EntityLinker
 
@@ -22,8 +22,9 @@ with open(CONFIG_PATH) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
     for model in config["chat_models"]:
-        name, provider = model["name"], model["provider"]
-        chat_models[name] = ChatClient(provider=provider, model=name)
+        name = model.get("snapshot", model["name"])
+        provider = model["provider"]
+        chat_models[model["name"]] = ChatClient(provider=provider, model=name)
 
     for embedder in config["embedding_collections"]:
         name = embedder["name"]
@@ -41,14 +42,20 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
     retriever_model: str = "llama3.2", generator_model: str = "llama3.2", embedder: str = "text-embedding-3-small", use_linking: bool = True) -> str:
 
     match strategy:
-        case "text_to_cypher":
+        case "text_to_cypher" | "text_to_cypher_extended":
             extra_context = linker.get_linked_context(question=question) if use_linking else ""
 
-            if use_linking:
-                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model])
-            else:
+            if strategy == "text_to_cypher_extended":
+                embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small")
+                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/extended_cypher_prompt_fewshot.txt", embedding_client=embedder)
+                cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context, extended_cypher=True)
+            elif not use_linking:
                 text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/t2c_prompt_no_entities.txt")
-            cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context)
+                cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context)
+            else:
+                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model])
+                cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context)
+
             if error:
                 return cypher_query, results, "Error has occurred.", error
 
@@ -75,3 +82,9 @@ def embeddings_search(search: str, embeddings_type: str = "text-embedding-3-smal
 
     embedder = embedders[embeddings_type]
     return embedder.query(search, k=k, threshold=threshold)
+
+embedder_te3s = EmbeddingClient(provider="openai", model="text-embedding-3-small")
+manual_t2ce = TextToCypherRetriever(client=None,  embedding_client=embedder_te3s)
+def manual_query(question: str):
+    query, results, errors = manual_t2ce.execute_query(query=question, extended_cypher=True)
+    return query, results, errors
