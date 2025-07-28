@@ -49,16 +49,21 @@ class TextToCypherRetriever:
         return cypher_query
 
     def execute_query(self, query: str, extended_cypher: bool = True):
+        params = {}
+        original_query = query
         if extended_cypher and self.embedding_client:
             query, params = self.convert_extended_functions(query)
 
         try:
-            records = self.neo4j_skb.query(query, other_params=params)
+            if params:
+                records = self.neo4j_skb.query(query, other_params=params)
+            else:
+                records = self.neo4j_skb.query(query)
             self.logger.info(f"Retrieved {len(records)} records from Neo4j.")
-            return query, self.remove_ids(records), None
+            return original_query, self.remove_ids(records), None
         except Exception as e:
             self.logger.error(f"Error running Cypher: {e}")
-            return query, [], f"Error during Cypher execution: {e}"
+            return original_query, [], f"Error during Cypher execution: {e}"
 
     def convert_extended_functions(self, query: str):
         # Fuzzy match replacement
@@ -80,11 +85,12 @@ class TextToCypherRetriever:
             query = re.sub( # TODO: Deal with OR clause
                 rf"(WHERE|AND)\s+IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)",
                 f"WITH *, vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}\n"
-                f"WHERE {similarity_var} > 0.33",
+                f"WHERE {similarity_var} > 0.665",
                 query
             )
             params[vector_placeholder] = vector
 
+        self.logger.info(f"Converted query to: {query}")
         return query, params
 
     def remove_ids(self, records):

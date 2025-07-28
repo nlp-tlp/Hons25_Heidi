@@ -50,7 +50,7 @@ for entry in st.session_state.chat_history_T2EC:
         st.markdown(entry["msg"])
 
         if "cypher" in entry:
-            with st.expander("Show Cypher Query"):
+            with st.expander("Show Extended Cypher Query"):
                 st.code(entry["cypher"], language="cypher", height=200)
 
         if "error" in entry:

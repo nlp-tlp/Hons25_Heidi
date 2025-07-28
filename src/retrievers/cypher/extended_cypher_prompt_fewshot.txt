@@ -1,0 +1,38 @@
+### Task
+
+Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
+
+### Neo4j graph schema
+
+{schema}
+
+### Question to convert
+
+{question}
+
+### Extended Cypher functions
+
+Aside from existing Cypher functions and syntax, make use the additional functions below where necessary. Any text property matches must be done with these functions in WHERE clauses, instead of typical exact matches.
+
+1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for fitering string fields that do not have the @match_semantically tag.
+2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
+
+### Rules
+
+1. Any text property matches must be done with one of the above extended functions, chosen depending on the @match_semantically tag.
+2. Do not return node objects. Instead, return entity properties or aggregation aliases.
+
+### Few-shot examples
+
+Question: What is the average RPN for failure modes in the fuel pump?
+Cypher:
+MATCH (ss:Subsystem)<-[:PART_OF]-(c:Component)<-[:PART_OF]-(sc:SubComponent)<-[:FOR_PART]-(fm:FailureMode)
+WHERE IS_FUZZY_MATCH(sc.name, 'fuel pump')
+RETURN ss.name, c.name, sc.name, AVG(fm.rpn), COUNT(fm.rpn)
+
+Question: What are the failure modes in the Power Train subsystem, which have recommended actions related to lubrication?
+Cypher:
+MATCH (ss:Subsystem)<-[:PART_OF]-(c:Component)<-[:PART_OF]-(sc:SubComponent)<-[:FOR_PART]-(fm:FailureMode)-[:HAS_ACTION]->(ra:RecommendedAction)
+WHERE IS_FUZZY_MATCH(ss.name, 'power train')
+    AND IS_SEMANTIC_MATCH(ra.description, 'lubrication')
+RETURN ss.name, c.name, sc.name, fm.description, ra.description

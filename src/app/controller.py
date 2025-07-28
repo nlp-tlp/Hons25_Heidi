@@ -47,7 +47,7 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
 
             if strategy == "text_to_cypher_extended":
                 embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small")
-                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/extended_cypher_prompt.txt", embedding_client=embedder)
+                text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/extended_cypher_prompt_fewshot.txt", embedding_client=embedder)
                 cypher_query, results, error = text_to_cypher_retriever.retrieve(question=question, extra_context=extra_context, extended_cypher=True)
             elif not use_linking:
                 text_to_cypher_retriever = TextToCypherRetriever(client=chat_models[retriever_model], prompt_path="retrievers/cypher/t2c_prompt_no_entities.txt")

@@ -6,6 +6,10 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 {schema}
 
+### Question to convert
+
+{question}
+
 ### Extended functions
 
 Aside from existing Cypher functions and syntax, make use the additional functions below where necessary. Any text property matches must be done with these functions in WHERE clauses, instead of typical exact matches.
