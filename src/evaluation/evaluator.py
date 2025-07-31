@@ -40,9 +40,10 @@ class PlanOutputEvaluator:
             generated_queries = json.load(f)
 
         # Execute until end or error
-        metrics_store = [{"question_id": "avg", "precision_all": 0, "recall_all": 0, "precision_col": 0, "recall_col": 0}]
+        metrics_store = [{"question_id": "avg", "precision_all": 0, "recall_all": 0, "precision_col": 0, "recall_col": 0, "query_length": 0, "order_correctness": 0}]
         for gold_query, generated_query in zip(gold_queries, generated_queries):
             entry_id = gold_query["id"]
+            entry_eval_config = gold_query["eval_config"]
 
             # Execute
             try:
@@ -52,11 +53,29 @@ class PlanOutputEvaluator:
                 self.logger.error(f"Error during query/ plan execution on ID {entry_id}: {e}")
                 break
 
+            # Deal with no output
+            if len(generated_output) == 0 or len(gold_output) == 0:
+                metrics = {
+                    "question_id": entry_id,
+                    "query_length": len(generated_query) / len(gold_query),
+                }
+
+                if len(generated_output) == 0 and len(gold_output) == 0:
+                    metrics.update({"precision_all": 1.0, "recall_all": 1.0, "precision_col": 1.0, "recall_col": 1.0, "order_correctness": 1.0})
+                elif len(generated_output) != 0:
+                    metrics.update({"precision_all": 0.0, "recall_all": 1.0, "precision_col": 0.0, "recall_col": 1.0, "order_correctness": 0.0})
+                else:
+                    metrics.update({"precision_all": 1.0, "recall_all": 0.0, "precision_col": 1.0, "recall_col": 0.0, "order_correctness": 1.0})
+                metrics_store.append(metrics)
+                for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
+                    metrics_store[0][key] += metrics[key]
+                break
+
             # Normalise generated output if aliases are different
             gold_field_names = list(gold_output[0].keys())
             generated_field_names = list(generated_output[0].keys())
 
-            if not set(gold_field_names) == set(generated_field_names):
+            if not set(gold_field_names).issubset(set(generated_field_names)):
                 field_mappings = self.predict_alias_mappings(gold_aliases=gold_field_names, candidate_aliases=generated_field_names)
                 print(f"MAPPING: {field_mappings}")
 
@@ -64,31 +83,32 @@ class PlanOutputEvaluator:
 
             # Calculate and score evaluation
             metrics = {"question_id": entry_id}
-            metrics.update(self.calc_row_metrics(gold_output=gold_output, generated_output=generated_output))
-            metrics.update(self.calc_col_metrics(gold_aliases=gold_field_names, normalised_candidate_aliases=list(generated_output[0].keys())))
+            metrics.update(self.calc_row_metrics(gold_output=gold_output, generated_output=generated_output, eval_config=entry_eval_config))
+            metrics.update(self.calc_col_metrics(gold_aliases=gold_field_names, normalised_candidate_aliases=list(generated_output[0].keys()), optional_columns=entry_eval_config["optional_columns"]))
             metrics["query_length"] = len(generated_query) / len(gold_query)
             metrics_store.append(metrics)
 
-            for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length"]:
+            for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
                 metrics_store[0][key] += metrics[key]
 
-        for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length"]:
-            metrics_store[0][key] /= len(metrics_store) - 1
+        for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
+            metrics_store[0][key] = round(metrics_store[0][key] / (len(metrics_store) - 1), 4)
 
         # Save evaluation as CSV
         with open(metrics_filepath, 'w') as f:
-            dict_writer = csv.DictWriter(f, fieldnames=["question_id", "precision_all", "recall_all", "precision_col", "recall_col"])
+            dict_writer = csv.DictWriter(f, fieldnames=["question_id", "precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"])
             dict_writer.writeheader()
             dict_writer.writerows(metrics_store[1:] + [metrics_store[0]])
 
     def predict_alias_mappings(self, gold_aliases: str, candidate_aliases: str):
         mapping_prompt = self.output_mapping_prompt.format(gold_aliases=gold_aliases, candidate_aliases=candidate_aliases)
-        self.logger.debug(f"Prompting LLM using {mapping_prompt}")
+        self.logger.info(f"Prompting LLM using {mapping_prompt}")
 
         response = self.mapper_client.chat(prompt=mapping_prompt)
-        self.logger.debug(f"LLM response: {response}")
+        response = response.replace("```json", "").replace("```", "").strip()
+        self.logger.info(f"LLM response: {response}")
 
-        response_object = json.load(response)
+        response_object = json.loads(response)
         return response_object
 
     def filter_optional_columns(self, entry, optional_columns: list[str]):
@@ -96,6 +116,7 @@ class PlanOutputEvaluator:
 
     def calc_row_metrics(self, gold_output: list[dict[str, any]], generated_output: list[dict[str, any]], eval_config: dict[str, any]):
         optional_columns = eval_config.get("optional_columns", [])
+        order_config = eval_config.get("order")
 
         # Filter optional columns for structural matching
         gold_entries = [frozenset(self.filter_optional_columns(entry, optional_columns).items()) for entry in gold_output]
@@ -114,41 +135,45 @@ class PlanOutputEvaluator:
         for gold_entry, gold_entry_with_optional in zip(gold_entries, gold_entries_with_optional):
             best_match_i = None
             best_match_pairs = 0
+            best_match_incorrect_optionals = 0
 
             for i, (generated_entry, generated_entry_with_optional) in enumerate(zip(generated_entries, generated_entries_with_optional)):
                 if i in matched_generated_entries:
                     continue
 
-                # Compare structural pairs (excluding optional columns)
                 correct_pairs = gold_entry & generated_entry
-
-                # Compare optional column values (penalize incorrect values)
-                correct_optional_pairs = {
-                    (k, v) for k, v in gold_entry_with_optional & generated_entry_with_optional
-                    if k in optional_columns and v == dict(generated_entry_with_optional).get(k)
-                }
-                correct_pairs = correct_pairs | correct_optional_pairs
+                incorrect_optional_pairs = [
+                    (k, v) for k, v in gold_entry_with_optional
+                    if (k in optional_columns) and (k in dict(generated_entry_with_optional)) and (v != dict(generated_entry_with_optional).get(k))
+                ]
 
                 if len(correct_pairs) > best_match_pairs:
                     best_match_i = i
                     best_match_pairs = len(correct_pairs)
+                    best_match_incorrect_optionals = len(incorrect_optional_pairs)
 
             total_correct_pairs += best_match_pairs
-
-            # Only count non-optional columns for recall
-            total_gold_pairs += len({k: v for k, v in gold_entry_with_optional if k not in optional_columns})
+            total_gold_pairs += len(gold_entry) + best_match_incorrect_optionals
+            total_predicted_pairs += len(generated_entry) + best_match_incorrect_optionals
 
             if best_match_i is not None:
                 matched_generated_entries.add(best_match_i)
 
-        # Calculate total predicted pairs
-        total_predicted_pairs += sum(len(entry) for entry in generated_entries_with_optional)
+        # Handle unmatched predicted pairs
+        total_predicted_pairs += sum(len(entry) for i, entry in enumerate(generated_entries) if i not in matched_generated_entries)
 
-        # Calculate precision and recall
+        # Check order
+        order_correctness = 1.0
+        if order_config:
+            alias_name, direction = order_config
+            generated_sorted = sorted(generated_output, key=lambda x: x.get(alias_name, None), reverse=(direction == "DESC"))
+            order_correctness = 1.0 if all(output == output_sorted for output, output_sorted, in zip(generated_output, generated_sorted)) else 0.0
+
+        # Calculate scores
         precision_all = total_correct_pairs / total_predicted_pairs if total_predicted_pairs > 0 else 0.0
         recall_all = total_correct_pairs / total_gold_pairs if total_gold_pairs > 0 else 0.0
 
-        return {"precision_all": round(precision_all, 4), "recall_all": round(recall_all, 4)}
+        return {"precision_all": round(precision_all, 4), "recall_all": round(recall_all, 4), "order_correctness": order_correctness}
 
     def calc_col_metrics(self, gold_aliases: list[str], normalised_candidate_aliases: list[str], optional_columns: list[str]):
         gold_set = set([alias for alias in gold_aliases if alias not in optional_columns])
@@ -165,7 +190,8 @@ def test_row_metrics():
     evaluator = PlanOutputEvaluator(mapper_client=None)
 
     eval_config = {
-        "optional_columns": "country"
+        "optional_columns": "country",
+        "order": None
     }
 
     # Exact same
@@ -200,6 +226,14 @@ def test_row_metrics():
     # Additional column
     generated_output = [{"name": "Alice", "age": 30, "city": "New York"}, {"name": "Bob", "age": 25, "city": "New York"}]
     print(f"Additional column: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
+
+    # Bad order
+    eval_config = {
+        "optional_columns": "country",
+        "order": ["age", "DESC"]
+    }
+    generated_output = [{"name": "Bob", "age": 25, "country": "B"}, {"name": "Alice", "age": 30, "country": "A"}]
+    print(f"Bad order: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
 def test_col_metrics():
     evaluator = PlanOutputEvaluator(mapper_client=None)

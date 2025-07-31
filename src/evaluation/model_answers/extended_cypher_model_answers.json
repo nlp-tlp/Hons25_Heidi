@@ -2,10 +2,14 @@
 	{
 		"id": "1",
 		"question": "What is the RPN for condenser",
-		"ground_truth_query": "MATCH (subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subcomponent.name, 'condenser')  RETURN subcomponent.name, failuremode.description, failuremode.rpn",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subcomponent.name, 'condenser') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.rpn",
 		"eval_config": {
-			"optional_columns": [],
-			"comparison_mode": "unordered"
+			"optional_columns": [
+				"subsystem.name",
+				"component.name",
+				"subcomponent.name"
+			],
+			"order": null
 		}
 	},
 	{
@@ -14,7 +18,34 @@
 		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component) WHERE IS_FUZZY_MATCH(component.name, 'engine')  RETURN subsystem.name, component.name",
 		"eval_config": {
 			"optional_columns": [],
-			"comparison_mode": "unordered"
+			"order": null
+		}
+	},
+	{
+		"id": "3",
+		"question": "What is the recommended action for wearing on the transmission mount?",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:HAS_ACTION]->(recommendedaction:RecommendedAction) WHERE IS_FUZZY_MATCH(subcomponent.name, 'transmission mount')     AND IS_SEMANTIC_MATCH(failuremode.description, 'wearing') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, recommendedaction.description",
+		"eval_config": {
+			"optional_columns": ["subsystem.name", "component.name"],
+			"order": null
+		}
+	},
+	{
+		"id": "16",
+		"question": "How many distinct sub-components are listed in the data",
+		"ground_truth_query": "MATCH (sc:SubComponent) RETURN COUNT(sc)",
+		"eval_config": {
+			"optional_columns": [],
+			"order": null
+		}
+	},
+	{
+		"id": "29",
+		"question": "Give me all the subsystems in descending order of their average occurrence values.",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF*2]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) RETURN subsystem.name, AVG(failuremode.occurrence) ORDER BY AVG(failuremode.occurrence) DESC",
+		"eval_config": {
+			"optional_columns": [],
+			"order": ["AVG(failuremode.occurrence)", "DESC"]
 		}
 	}
 ]
