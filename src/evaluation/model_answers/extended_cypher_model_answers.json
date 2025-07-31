@@ -1,0 +1,20 @@
+[
+	{
+		"id": "1",
+		"question": "What is the RPN for condenser",
+		"ground_truth_query": "MATCH (subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subcomponent.name, 'condenser')  RETURN subcomponent.name, failuremode.description, failuremode.rpn",
+		"eval_config": {
+			"optional_columns": [],
+			"comparison_mode": "unordered"
+		}
+	},
+	{
+		"id": "2",
+		"question": "What is the subsystem for the engine?",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component) WHERE IS_FUZZY_MATCH(component.name, 'engine')  RETURN subsystem.name, component.name",
+		"eval_config": {
+			"optional_columns": [],
+			"comparison_mode": "unordered"
+		}
+	}
+]

@@ -26,13 +26,13 @@ Aside from existing Cypher functions and syntax, make use the additional functio
 
 Question: What is the average RPN for failure modes in the fuel pump?
 Cypher:
-MATCH (ss:Subsystem)<-[:PART_OF]-(c:Component)<-[:PART_OF]-(sc:SubComponent)<-[:FOR_PART]-(fm:FailureMode)
-WHERE IS_FUZZY_MATCH(sc.name, 'fuel pump')
-RETURN ss.name, c.name, sc.name, AVG(fm.rpn), COUNT(fm.rpn)
+MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)
+WHERE IS_FUZZY_MATCH(subcomponent.name, 'fuel pump')
+RETURN subsystem.name, component.name, subcomponent.name, AVG(failuremode.rpn), COUNT(failuremode.rpn)
 
 Question: What are the failure modes in the Power Train subsystem, which have recommended actions related to lubrication?
 Cypher:
-MATCH (ss:Subsystem)<-[:PART_OF]-(c:Component)<-[:PART_OF]-(sc:SubComponent)<-[:FOR_PART]-(fm:FailureMode)-[:HAS_ACTION]->(ra:RecommendedAction)
-WHERE IS_FUZZY_MATCH(ss.name, 'power train')
-    AND IS_SEMANTIC_MATCH(ra.description, 'lubrication')
-RETURN ss.name, c.name, sc.name, fm.description, ra.description
+MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:HAS_ACTION]->(recommendedaction:RecommendedAction)
+WHERE IS_FUZZY_MATCH(subsystem.name, 'power train')
+    AND IS_SEMANTIC_MATCH(recommendedaction.description, 'lubrication')
+RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, recommendedaction.description
