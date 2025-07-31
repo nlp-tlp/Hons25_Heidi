@@ -57,7 +57,7 @@ class PlanOutputEvaluator:
             if len(generated_output) == 0 or len(gold_output) == 0:
                 metrics = {
                     "question_id": entry_id,
-                    "query_length": len(generated_query) / len(gold_query),
+                    "query_length": len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"]),
                 }
 
                 if len(generated_output) == 0 and len(gold_output) == 0:
@@ -85,7 +85,7 @@ class PlanOutputEvaluator:
             metrics = {"question_id": entry_id}
             metrics.update(self.calc_row_metrics(gold_output=gold_output, generated_output=generated_output, eval_config=entry_eval_config))
             metrics.update(self.calc_col_metrics(gold_aliases=gold_field_names, normalised_candidate_aliases=list(generated_output[0].keys()), optional_columns=entry_eval_config["optional_columns"]))
-            metrics["query_length"] = len(generated_query) / len(gold_query)
+            metrics["query_length"] = len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"])
             metrics_store.append(metrics)
 
             for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:

@@ -48,6 +48,6 @@ def eval_t2ce(generate: bool = True, evaluate: bool = True,):
         )
 
 if __name__ == "__main__":
-    eval_t2ce(generate=False, evaluate=True)
+    eval_t2ce(generate=True, evaluate=True)
     # test_row_metrics()
     # test_col_metrics()
