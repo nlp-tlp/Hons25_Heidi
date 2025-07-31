@@ -40,7 +40,7 @@ class PlanOutputEvaluator:
             generated_queries = json.load(f)
 
         # Execute until end or error
-        metrics_store = []
+        metrics_store = [{"question_id": "avg", "precision_all": 0, "recall_all": 0, "precision_col": 0, "recall_col": 0}]
         for gold_query, generated_query in zip(gold_queries, generated_queries):
             entry_id = gold_query["id"]
 
@@ -60,22 +60,26 @@ class PlanOutputEvaluator:
                 field_mappings = self.predict_alias_mappings(gold_aliases=gold_field_names, candidate_aliases=generated_field_names)
                 print(f"MAPPING: {field_mappings}")
 
-                generated_output = [
-                    {field_mappings.get(k, k): v for k, v in entry.items()} for entry in generated_output
-                ]
+                generated_output = [{field_mappings.get(k, k): v for k, v in entry.items()} for entry in generated_output]
 
             # Calculate and score evaluation
-            metrics = {}
-            metrics["question_id"] = entry_id
+            metrics = {"question_id": entry_id}
             metrics.update(self.calc_row_metrics(gold_output=gold_output, generated_output=generated_output))
             metrics.update(self.calc_col_metrics(gold_aliases=gold_field_names, normalised_candidate_aliases=list(generated_output[0].keys())))
+            metrics["query_length"] = len(generated_query) / len(gold_query)
             metrics_store.append(metrics)
+
+            for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length"]:
+                metrics_store[0][key] += metrics[key]
+
+        for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length"]:
+            metrics_store[0][key] /= len(metrics_store) - 1
 
         # Save evaluation as CSV
         with open(metrics_filepath, 'w') as f:
             dict_writer = csv.DictWriter(f, fieldnames=["question_id", "precision_all", "recall_all", "precision_col", "recall_col"])
             dict_writer.writeheader()
-            dict_writer.writerows(metrics_store)
+            dict_writer.writerows(metrics_store[1:] + [metrics_store[0]])
 
     def predict_alias_mappings(self, gold_aliases: str, candidate_aliases: str):
         mapping_prompt = self.output_mapping_prompt.format(gold_aliases=gold_aliases, candidate_aliases=candidate_aliases)
@@ -87,9 +91,19 @@ class PlanOutputEvaluator:
         response_object = json.load(response)
         return response_object
 
-    def calc_row_metrics(self, gold_output: list[dict[str, any]], generated_output: list[dict[str, any]]):
-        gold_entries = [frozenset(entry.items()) for entry in gold_output]
-        generated_entries = [frozenset(entry.items()) for entry in generated_output]
+    def filter_optional_columns(self, entry, optional_columns: list[str]):
+        return {k: v for k, v in entry.items() if k not in optional_columns}
+
+    def calc_row_metrics(self, gold_output: list[dict[str, any]], generated_output: list[dict[str, any]], eval_config: dict[str, any]):
+        optional_columns = eval_config.get("optional_columns", [])
+
+        # Filter optional columns for structural matching
+        gold_entries = [frozenset(self.filter_optional_columns(entry, optional_columns).items()) for entry in gold_output]
+        generated_entries = [frozenset(self.filter_optional_columns(entry, optional_columns).items()) for entry in generated_output]
+
+        # Include optional columns for value matching
+        gold_entries_with_optional = [frozenset(entry.items()) for entry in gold_output]
+        generated_entries_with_optional = [frozenset(entry.items()) for entry in generated_output]
 
         total_correct_pairs = 0
         total_predicted_pairs = 0
@@ -97,40 +111,48 @@ class PlanOutputEvaluator:
         matched_generated_entries = set()
 
         # Find the best match from the gold entries
-        for gold_entry in gold_entries:
+        for gold_entry, gold_entry_with_optional in zip(gold_entries, gold_entries_with_optional):
             best_match_i = None
             best_match_pairs = 0
-            max_pairs = gold_entry & gold_entry
 
-            for i, generated_entry in enumerate(generated_entries):
+            for i, (generated_entry, generated_entry_with_optional) in enumerate(zip(generated_entries, generated_entries_with_optional)):
                 if i in matched_generated_entries:
                     continue
 
+                # Compare structural pairs (excluding optional columns)
                 correct_pairs = gold_entry & generated_entry
+
+                # Compare optional column values (penalize incorrect values)
+                correct_optional_pairs = {
+                    (k, v) for k, v in gold_entry_with_optional & generated_entry_with_optional
+                    if k in optional_columns and v == dict(generated_entry_with_optional).get(k)
+                }
+                correct_pairs = correct_pairs | correct_optional_pairs
+
                 if len(correct_pairs) > best_match_pairs:
                     best_match_i = i
                     best_match_pairs = len(correct_pairs)
 
-                    if len(matched_generated_entries) == len(gold_entries) or best_match_pairs == max_pairs:
-                        break
-
             total_correct_pairs += best_match_pairs
-            total_gold_pairs += len(gold_entry)
+
+            # Only count non-optional columns for recall
+            total_gold_pairs += len({k: v for k, v in gold_entry_with_optional if k not in optional_columns})
 
             if best_match_i is not None:
                 matched_generated_entries.add(best_match_i)
 
-        # Calculate scores
-        total_predicted_pairs += sum(len(entry) for entry in generated_entries)
+        # Calculate total predicted pairs
+        total_predicted_pairs += sum(len(entry) for entry in generated_entries_with_optional)
 
+        # Calculate precision and recall
         precision_all = total_correct_pairs / total_predicted_pairs if total_predicted_pairs > 0 else 0.0
         recall_all = total_correct_pairs / total_gold_pairs if total_gold_pairs > 0 else 0.0
 
         return {"precision_all": round(precision_all, 4), "recall_all": round(recall_all, 4)}
 
-    def calc_col_metrics(self, gold_aliases: list[str], normalised_candidate_aliases: list[str]):
-        gold_set = set(gold_aliases)
-        candidate_set = set(normalised_candidate_aliases)
+    def calc_col_metrics(self, gold_aliases: list[str], normalised_candidate_aliases: list[str], optional_columns: list[str]):
+        gold_set = set([alias for alias in gold_aliases if alias not in optional_columns])
+        candidate_set = set([alias for alias in normalised_candidate_aliases if alias not in optional_columns])
 
         true_positives = gold_set & candidate_set
 
@@ -142,43 +164,60 @@ class PlanOutputEvaluator:
 def test_row_metrics():
     evaluator = PlanOutputEvaluator(mapper_client=None)
 
+    eval_config = {
+        "optional_columns": "country"
+    }
+
     # Exact same
-    gold_output = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
+    gold_output = [{"name": "Alice", "age": 30, "country": "A"}, {"name": "Bob", "age": 25, "country": "B"}]
+    generated_output = [{"name": "Alice", "age": 30, "country": "A"}, {"name": "Bob", "age": 25, "country": "B"}]
+    print(f"Exact same: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
+
+    # Missing optional column
     generated_output = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
-    print(f"Exact same: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Missing optional column: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
+
+    # Optional column with wrong values
+    generated_output = [{"name": "Alice", "age": 30, "country": "B"}, {"name": "Bob", "age": 25, "country": "A"}]
+    print(f"Optional column with wrong values: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
     # Missing row
     generated_output = [{"name": "Alice", "age": 30}]
-    print(f"Missing row: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Missing row: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
     # Additional row
     generated_output = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}, {"name": "Charlie", "age": 35}]
-    print(f"Additional row: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Additional row: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
     # Wrong row with some same values
     generated_output = [{"name": "Alice", "age": 30}, {"name": "Charlie", "age": 25}]
-    print(f"Wrong row with some same values: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Wrong row with some same values: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
     # Missing column
     generated_output = [{"name": "Alice"}, {"name": "Bob"}]
-    print(f"Missing column: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Missing column: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
     # Additional column
     generated_output = [{"name": "Alice", "age": 30, "city": "New York"}, {"name": "Bob", "age": 25, "city": "New York"}]
-    print(f"Additional column: {evaluator.calc_row_metrics(gold_output, generated_output)}")
+    print(f"Additional column: {evaluator.calc_row_metrics(gold_output, generated_output, eval_config=eval_config)}")
 
 def test_col_metrics():
     evaluator = PlanOutputEvaluator(mapper_client=None)
+    optional_cols = ["extra"]
 
     # Exact same
-    gold_aliases = ["name", "age", "city"]
+    gold_aliases = ["name", "age", "city", "extra"]
+    normalised_candidate_aliases = ["name", "age", "city", "extra"]
+    print(f"Exact same: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases, optional_cols)}")
+
+    # Missing optional col
     normalised_candidate_aliases = ["name", "age", "city"]
-    print(f"Exact same: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases)}")
+    print(f"Missing optional field: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases, optional_cols)}")
 
     # One wrong name
     normalised_candidate_aliases = ["name", "age", "country"]
-    print(f"One wrong field: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases)}")
+    print(f"One wrong field: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases, optional_cols)}")
 
     # One additional field
     normalised_candidate_aliases = ["name", "age", "city", "country"]
-    print(f"One additional field: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases)}")
+    print(f"One additional field: {evaluator.calc_col_metrics(gold_aliases, normalised_candidate_aliases, optional_cols)}")
