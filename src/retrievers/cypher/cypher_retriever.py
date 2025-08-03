@@ -70,25 +70,35 @@ class TextToCypherRetriever:
         query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.fuzzyMatch(\1, \2)", query)
 
         # Semantic match replacement
-        match_params = re.findall(r"IS_SEMANTIC_MATCH\(([^,]+),\s*([^)]+)\)", query)
-        if not match_params:
+        where_matches = list(re.finditer(
+            r"(WHERE\s+)(.*?)(?=\s+(RETURN|WITH|ORDER BY|SKIP|LIMIT|MATCH|UNWIND|CALL|CREATE|MERGE|SET|DELETE|REMOVE|FOREACH|LOAD CSV|OPTIONAL MATCH|$))",
+            query,
+            re.IGNORECASE | re.DOTALL
+        ))
+        if not where_matches:
             return query, None
 
+        i = 1
         params = {}
-        for i, (target, search_phrase) in enumerate(match_params):
-            self.logger.info(f"Processing semantic match for: {search_phrase}")
-            vector = self.embedding_client.embed(search_phrase.strip())
+        for where_match in where_matches:
+            semantic_matches = re.findall(r"IS_SEMANTIC_MATCH\(([^,]+),\s*([^)]+)\)", where_match.group(0))
 
-            vector_placeholder = f"vector_{i}"
-            similarity_var = f"similarity_{i}"
-            target_entity = target.split('.')[0]
-            query = re.sub( # TODO: Deal with OR clause
-                rf"(WHERE|AND)\s+IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)",
-                f"WITH *, vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}\n"
-                f"WHERE {similarity_var} > 0.665",
-                query
-            )
-            params[vector_placeholder] = vector
+            with_clause = "WITH *"
+            new_where_clause = where_match.group(0)
+            for target, search_phrase in semantic_matches:
+                self.logger.info(f"Processing semantic match for: {search_phrase}")
+                vector = self.embedding_client.embed(search_phrase.strip())
+
+                vector_placeholder = f"vector_{i}"
+                similarity_var = f"similarity_{i}"
+                target_entity = target.split('.')[0]
+                i += 1
+
+                with_clause += f", vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}"
+                new_where_clause = re.sub(rf"IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{similarity_var} > 0.665", new_where_clause)
+                params[vector_placeholder] = vector
+
+            query = query.replace(where_match.group(0), f"{with_clause} {new_where_clause}")
 
         self.logger.info(f"Converted query to: {query}")
         return query, params

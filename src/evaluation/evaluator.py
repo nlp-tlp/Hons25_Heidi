@@ -40,10 +40,13 @@ class PlanOutputEvaluator:
             generated_queries = json.load(f)
 
         # Execute until end or error
-        metrics_store = [{"question_id": "avg", "precision_all": 0, "recall_all": 0, "precision_col": 0, "recall_col": 0, "query_length": 0, "order_correctness": 0}]
+        errored_ids = []
+        metrics_store = []
         for gold_query, generated_query in zip(gold_queries, generated_queries):
             entry_id = gold_query["id"]
             entry_eval_config = gold_query["eval_config"]
+
+            self.logger.info(f"Evaluating question ID: {entry_id}")
 
             # Execute
             try:
@@ -51,13 +54,17 @@ class PlanOutputEvaluator:
                 generated_output = plan_execution_function(generated_query["generated_query"])
             except Exception as e:
                 self.logger.error(f"Error during query/ plan execution on ID {entry_id}: {e}")
-                break
+                errored_ids.append(entry_id)
+
+                metrics_store.append({"question_id": entry_id, "precision_all": 0.0, "recall_all": 0.0, "precision_col": 0.0, "recall_col": 0.0, "order_correctness": 0.0, "query_length": round(len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"]), 4),})
+
+                continue
 
             # Deal with no output
             if len(generated_output) == 0 or len(gold_output) == 0:
                 metrics = {
                     "question_id": entry_id,
-                    "query_length": len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"]),
+                    "query_length": round(len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"]), 4),
                 }
 
                 if len(generated_output) == 0 and len(gold_output) == 0:
@@ -67,9 +74,8 @@ class PlanOutputEvaluator:
                 else:
                     metrics.update({"precision_all": 1.0, "recall_all": 0.0, "precision_col": 1.0, "recall_col": 0.0, "order_correctness": 1.0})
                 metrics_store.append(metrics)
-                for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
-                    metrics_store[0][key] += metrics[key]
-                break
+
+                continue
 
             # Normalise generated output if aliases are different
             gold_field_names = list(gold_output[0].keys())
@@ -85,20 +91,16 @@ class PlanOutputEvaluator:
             metrics = {"question_id": entry_id}
             metrics.update(self.calc_row_metrics(gold_output=gold_output, generated_output=generated_output, eval_config=entry_eval_config))
             metrics.update(self.calc_col_metrics(gold_aliases=gold_field_names, normalised_candidate_aliases=list(generated_output[0].keys()), optional_columns=entry_eval_config["optional_columns"]))
-            metrics["query_length"] = len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"])
+            metrics["query_length"] = round(len(generated_query["generated_query"]) / len(gold_query["ground_truth_query"]), 4)
             metrics_store.append(metrics)
-
-            for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
-                metrics_store[0][key] += metrics[key]
-
-        for key in ["precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"]:
-            metrics_store[0][key] = round(metrics_store[0][key] / (len(metrics_store) - 1), 4)
 
         # Save evaluation as CSV
         with open(metrics_filepath, 'w') as f:
             dict_writer = csv.DictWriter(f, fieldnames=["question_id", "precision_all", "recall_all", "precision_col", "recall_col", "query_length", "order_correctness"])
             dict_writer.writeheader()
-            dict_writer.writerows(metrics_store[1:] + [metrics_store[0]])
+            dict_writer.writerows(metrics_store)
+
+        self.logger.info(f"Finished evaluation, with errors on ids: {" ".join(errored_ids)}")
 
     def predict_alias_mappings(self, gold_aliases: str, candidate_aliases: str):
         mapping_prompt = self.output_mapping_prompt.format(gold_aliases=gold_aliases, candidate_aliases=candidate_aliases)
@@ -119,12 +121,26 @@ class PlanOutputEvaluator:
         order_config = eval_config.get("order")
 
         # Filter optional columns for structural matching
-        gold_entries = [frozenset(self.filter_optional_columns(entry, optional_columns).items()) for entry in gold_output]
-        generated_entries = [frozenset(self.filter_optional_columns(entry, optional_columns).items()) for entry in generated_output]
+        gold_entries = [
+            frozenset(self.make_hashable(self.filter_optional_columns(entry, optional_columns)).items())
+            for entry in gold_output
+            if self.make_hashable(entry) is not None
+        ]
+        generated_entries = [
+            frozenset(self.make_hashable(self.filter_optional_columns(entry, optional_columns)).items())
+            for entry in generated_output
+            if self.make_hashable(entry) is not None
+        ]
 
         # Include optional columns for value matching
-        gold_entries_with_optional = [frozenset(entry.items()) for entry in gold_output]
-        generated_entries_with_optional = [frozenset(entry.items()) for entry in generated_output]
+        gold_entries_with_optional = [
+            frozenset(self.make_hashable(entry).items()) for entry in gold_output
+            if self.make_hashable(entry) is not None
+        ]
+        generated_entries_with_optional = [
+            frozenset(self.make_hashable(entry).items()) for entry in generated_output
+            if self.make_hashable(entry) is not None
+        ]
 
         total_correct_pairs = 0
         total_predicted_pairs = 0
@@ -174,6 +190,14 @@ class PlanOutputEvaluator:
         recall_all = total_correct_pairs / total_gold_pairs if total_gold_pairs > 0 else 0.0
 
         return {"precision_all": round(precision_all, 4), "recall_all": round(recall_all, 4), "order_correctness": order_correctness}
+
+    def make_hashable(self, entry):
+        if not isinstance(entry, dict):
+            return None  # Skip non-dictionary entries
+        return {
+            k: tuple(v) if isinstance(v, list) else frozenset(v.items()) if isinstance(v, dict) else v
+            for k, v in entry.items()
+        }
 
     def calc_col_metrics(self, gold_aliases: list[str], normalised_candidate_aliases: list[str], optional_columns: list[str]):
         gold_set = set([alias for alias in gold_aliases if alias not in optional_columns])

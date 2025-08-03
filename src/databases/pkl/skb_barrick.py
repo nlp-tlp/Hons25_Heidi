@@ -21,7 +21,7 @@ class BarrickSchema(SKBSchema):
 
     class FailureMode(SKBNode):
         in_source: list[str] = Field(..., relation=True, dest='Source')
-        for_part: list[str] = Field(..., id=True, relation=True, dest='SubComponent, Component, Subsystem')
+        for_part: list[str] = Field(..., id=True, relation=True, dest='SubComponent')
         related_to: list[str] = Field(..., relation=True, dest='FailureCause, FailureEffect')
         has_action: list[str] = Field(..., relation=True, dest='CurrentControls, RecommendedAction')
         description: str = Field(..., id=True, semantic=True)

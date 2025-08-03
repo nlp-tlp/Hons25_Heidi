@@ -68,7 +68,7 @@
 	{
 		"id": "7",
 		"question": "What could be the cause of the ECU overloading in the power train?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failurecause:FailureCause) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_FUZZY_MATCH(subcomponent:SubComponent, 'ecu')     AND IS_SEMANTIC_MATCH(failuremode.description, 'overloading') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failurecause.description",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failurecause:FailureCause) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_FUZZY_MATCH(subcomponent.name, 'ecu')     AND IS_SEMANTIC_MATCH(failuremode.description, 'overloading') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failurecause.description",
 		"eval_config": {
 			"optional_columns": [
 				"subsystem.name",
@@ -82,7 +82,7 @@
 	{
 		"id": "8",
 		"question": "What are all the subsystems available?",
-		"ground_truth_query": "MATCH (s:Subsystem) RETURN s.name",
+		"ground_truth_query": "MATCH (subsystem:Subsystem) RETURN subsystem.name",
 		"eval_config": {
 			"optional_columns": [],
 			"order": null
@@ -100,7 +100,7 @@
 	{
 		"id": "10",
 		"question": "What are the RPNs for failure modes associated with the subcomponent Batteries?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:Batteries)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subcomponent.name, 'batteries) RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.rpn",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subcomponent.name, 'batteries') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.rpn",
 		"eval_config": {
 			"optional_columns": [
 				"subsystem.name",
@@ -143,7 +143,7 @@
 	{
 		"id": "14",
 		"question": "What component in the Power Unit subsystem has the highest occurrence value for failure modes associated with leaks?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit')     AND IS_SEMANTIC_MATCH(failuremode.description, 'leaks') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.occurrence AS fmOccurrence ORDER BY failuremode.occurrence DESC LIMIT 1",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_SEMANTIC_MATCH(failuremode.description, 'leaks') WITH MAX(failuremode.occurrence) AS max_occurrence MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_SEMANTIC_MATCH(failuremode.description, 'leaks') AND failuremode.occurrence = max_occurrence RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.occurrence",
 		"eval_config": {
 			"optional_columns": ["subsystem.name", "subcomponent.name"],
 			"order": null
@@ -152,7 +152,7 @@
 	{
 		"id": "15",
 		"question": "What is the failure mode most likely to be detected in the power train?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.detection ORDER BY failuremode.detection DESC LIMIT 1",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'power train') WITH  MAX(failuremode.detection) as max_detection  MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'power train')     AND failuremode.detection = max_detection RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.detection",
 		"eval_config": {
 			"optional_columns": [
 				"subsystem.name",
@@ -196,7 +196,7 @@
 	{
 		"id": "19",
 		"question": "There is a fire in the electrical system, what is the most likely reason for this?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failureeffect:FailureEffect) WHERE IS_FUZZY_MATCH(component.name, 'electrical system')     AND IS_SEMANTIC_MATCH(failureeffect.description, 'fire') RETURN component.name, subcomponent.name, failuremode.description, failuremode.occurrence, failureeffect.description ORDER BY failuremode.occurrence DESC",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failureeffect:FailureEffect) WHERE IS_FUZZY_MATCH(component.name, 'electrical system')     AND IS_SEMANTIC_MATCH(failureeffect.description, 'fire') WITH max(failuremode.occurrence) AS top_occurrence  MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failureeffect:FailureEffect) WHERE IS_FUZZY_MATCH(component.name, 'electrical system')     AND IS_SEMANTIC_MATCH(failureeffect.description, 'fire')     AND failuremode.occurrence = top_occurrence RETURN component.name, subcomponent.name, failuremode.description, failuremode.occurrence, failureeffect.description",
 		"eval_config": {
 			"optional_columns": [
 				"subsystem.name",
@@ -209,7 +209,7 @@
 	{
 		"id": "20",
 		"question": "What is the component with the highest number of failures and its most severe failure mode?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) RETURN subsystem.name, component.name, COUNT(fm), MAX(failuremode.severity) ORDER BY COUNT(fm) DESC",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WITH component, COUNT(failuremode) AS fmCount WITH MAX(fmCount) AS maxFmCount MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WITH subsystem, component, COUNT(failuremode) AS fmCount, maxFmCount WHERE fmCount = maxFmCount WITH subsystem, component, maxFmCount MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WITH subsystem, component, maxFmCount, MAX(failuremode.occurrence) AS maxOccurrence MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE failuremode.occurrence = maxOccurrence RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.occurrence",
 		"eval_config": {
 			"optional_columns": ["subsystem.name"],
 			"order": null
@@ -218,7 +218,7 @@
 	{
 		"id": "21",
 		"question": "Are there any high RPN (25+) failure modes that are hard to detect (2-) but do not yet have a recommended action?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE failuremode.rpn >= 25     AND failuremode.detection <= 2     AND NOT (fm)-[:HAS_ACTION]->(:RecommendedAction) RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.rpn, failuremode.detection",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE failuremode.rpn >= 25     AND failuremode.detection <= 2     AND NOT (failuremode)-[:HAS_ACTION]->(:RecommendedAction) RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, failuremode.rpn, failuremode.detection",
 		"eval_config": {
 			"optional_columns": ["subsystem.name", "component.name"],
 			"order": null
@@ -227,7 +227,7 @@
 	{
 		"id": "22",
 		"question": "What percentage of hydraulic system failure modes have an RPN of above 15.",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF*2]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'hydraulic system') WITH ss, COUNT(fm) AS total, COUNT(CASE WHEN failuremode.rpn > 15 THEN fm END) AS above_15 RETURN subsystem.name, above_15, total, (toFloat(above_15) / total) * 100 AS percentage",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF*2]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode) WHERE IS_FUZZY_MATCH(subsystem.name, 'hydraulic system') WITH subsystem, COUNT(failuremode) AS total, COUNT(CASE WHEN failuremode.rpn > 15 THEN failuremode END) AS above_15 RETURN subsystem.name, above_15, total, (toFloat(above_15) / total) * 100 AS percentage",
 		"eval_config": {
 			"optional_columns": ["subsystem.name", "above_15", "total"],
 			"order": null
@@ -236,7 +236,7 @@
 	{
 		"id": "23",
 		"question": "Are there any failure modes that have multiple causes?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[rt:RELATED_TO]->(failurecause:FailureCause) WITH ss, c, sc, fm, COUNT(rt) AS numCauses, COLLECT(failurecause.description) AS causes WHERE numCauses > 1 RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, numCauses, causes",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[rt:RELATED_TO]->(failurecause:FailureCause) WITH subsystem, component, subcomponent, failuremode, COUNT(rt) AS numCauses, COLLECT(failurecause.description) AS causes WHERE numCauses > 1 RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, numCauses, causes",
 		"eval_config": {
 			"optional_columns": ["subsystem.name", "component.name"],
 			"order": null
@@ -271,7 +271,7 @@
 	{
 		"id": "26",
 		"question": "There has been wearing on the fan drive assembly in the power unit. Is it more likely to be caused by physical impact or overheating?",
-		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failurecause:FailureCause) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_FUZZY_MATCH(subcomponent.name, 'fan drive assembly')     AND IS_SEMANTIC_MATCH(failurecause.description, 'physical impact') OR IS_SEMANTIC_MATCH(failurecause.description, 'overheating') RETURN subsystem.name, subcomponent.name, failuremode.description, failuremode.occurrence, failurecause.description ORDER BY failuremode.occurrence DESC",
+		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:RELATED_TO]->(failurecause:FailureCause) WHERE IS_FUZZY_MATCH(subsystem.name, 'power unit') AND IS_FUZZY_MATCH(subcomponent.name, 'fan drive assembly') AND (IS_SEMANTIC_MATCH(failurecause.description, 'physical impact') OR IS_SEMANTIC_MATCH(failurecause.description, 'overheating')) RETURN subsystem.name, subcomponent.name, failuremode.description, failuremode.occurrence, failurecause.description ORDER BY failuremode.occurrence DESC",
 		"eval_config": {
 			"optional_columns": [
 				"subsystem.name",
@@ -283,7 +283,7 @@
 	},
 	{
 		"id": "27",
-		"question": "No actions have been recommended for the Corrosion failure mode on the Wiper Motor subcomponent on the Cabin Controls component.",
+		"question": "What is the recommended action for corrosion of the Cabin controls wiper motor",
 		"ground_truth_query": "MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:HAS_ACTION]->(recommendedaction:RecommendedAction) WHERE IS_FUZZY_MATCH(component.name, 'cabin controls') AND IS_FUZZY_MATCH(subcomponent.name, 'wiper motor')     AND IS_FUZZY_MATCH(failuremode.description, 'corrosion') RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, recommendedaction.description",
 		"eval_config": {
 			"optional_columns": [
@@ -326,7 +326,7 @@
 				"component.name",
 				"subcomponent.name"
 			],
-			"order": ["AVG(failuremode.occurrence)", "DESC"]
+			"order": null
 		}
 	}
 ]

@@ -11,8 +11,8 @@ logging.basicConfig(
 )
 
 MODEL_ANSWERS_FILEPATH = "evaluation/model_answers/extended_cypher_model_answers.json"
-GENERATED_ANSWERS_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t1.json"
-METRICS_STORE_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t1metrics.csv"
+GENERATED_ANSWERS_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t3.json"
+METRICS_STORE_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t3metrics.csv"
 
 def eval_t2ce(generate: bool = True, evaluate: bool = True,):
     # Initialise
@@ -29,6 +29,10 @@ def eval_t2ce(generate: bool = True, evaluate: bool = True,):
 
     def executor_function(query: str) -> list[dict[str, any]]:
         _original_query, output, _error = t2c_retriever.execute_query(query=query, extended_cypher=True)
+
+        if _error:
+            raise Exception()
+
         return output
 
     # Evaluate
