@@ -189,3 +189,6 @@ chroma/
 # Experimental
 experimental/
 helpers/
+
+# Evaluation runs
+experiment_runs/

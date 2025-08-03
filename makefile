@@ -10,3 +10,6 @@ endef
 
 run_app: ## Hosts streamlit chat interface
 	cd src && python3 -m streamlit run app/Chat_Text2ExtendedCypher.py
+
+run_app_hl: ## Hosts streamlit chat interface headless, does not start new browser window
+	cd src && python3 -m streamlit run app/Chat_Text2ExtendedCypher.py --server.headless true
