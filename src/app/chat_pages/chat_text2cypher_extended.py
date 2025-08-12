@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 
-from controller import rag_query, get_chat_model_names
+from app.controller import rag_query, get_chat_model_names
 
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 
