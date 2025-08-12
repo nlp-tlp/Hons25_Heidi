@@ -99,38 +99,48 @@ class NeighbourVectorRetriever:
         emb_vars = []
 
         for i, step in enumerate(plan["steps"]):
-            emb_var = f"embedding{i}"
-            emb_vars.append(emb_var)
+            emb_vars.append(f"embedding{i}")
 
             if step["type"] == "query":
-                cypher_lines.append(f"""\
-                MATCH (n)
-                WHERE n.embedding IS NOT NULL
-                WITH n, vector.similarity.cosine(n.embedding, ${emb_var}) AS score{i}
-                ORDER BY score{i} DESC
-                LIMIT {top_k}
-                WITH collect(n) AS intermediate_set{", [] AS final_pool" if i == 0 else ", final_pool"}
-                """)
-
+                cypher_lines.append(self.query_step_cypher(i, top_k))
             elif step["type"] == "search":
-                prev = "intermediate_set"
-                cypher_lines.append(f"""\
-                UNWIND {prev} AS iset{i}
-                MATCH (iset{i})-[r{i}]-(neighbor{i})
-                WITH DISTINCT iset{i}, neighbor{i}, type(r{i}) AS rel_type{i}, r{i}, {prev}, final_pool
-                WITH iset{i}, neighbor{i}, rel_type{i}, vector.similarity.cosine(neighbor{i}.embedding, ${emb_var}) AS score{i}, {prev}, final_pool
-                ORDER BY score{i} DESC
-                LIMIT {top_k}
-                WITH collect({{
-                    source: apoc.map.removeKey(apoc.map.removeKey(iset{i}, 'embedding'), 'external_id'),
-                    rel: rel_type{i},
-                    target: apoc.map.removeKey(apoc.map.removeKey(neighbor{i}, 'embedding'), 'external_id')
-                }}) AS new_triples, {prev}, final_pool
-                WITH apoc.coll.toSet(final_pool + new_triples) AS final_pool,
-                    apoc.coll.toSet({prev}) AS intermediate_set
-                """)
+                cypher_lines.append(self.search_step_cypher(i, top_k))
             else:
                 raise ValueError(f"Unknown step type: {step['type']}")
-
         cypher_lines.append("RETURN final_pool")
+
         return "\n".join(cypher_lines), emb_vars
+
+    def query_step_cypher(self, step_i, k):
+        return f"""\
+        MATCH (n)
+        WHERE n.embedding IS NOT NULL
+        WITH n, vector.similarity.cosine(n.embedding, $embedding{step_i}) AS score{step_i}
+        ORDER BY score{step_i} DESC
+        LIMIT {k}
+        WITH collect({{
+            source: apoc.map.setKey(apoc.map.removeKey(apoc.map.removeKey(n, 'embedding'), 'external_id'), 'entity_type', labels(n)[0]),
+            rel: NULL,
+            target: NULL
+        }}) AS new_triples,
+            collect(n) AS intermediate_set{", [] AS final_pool" if step_i == 0 else ", final_pool"}
+        WITH apoc.coll.toSet(final_pool + new_triples) AS final_pool, intermediate_set
+        """
+
+    def search_step_cypher(self, step_i, k):
+        return f"""\
+        UNWIND intermediate_set AS iset{step_i}
+        MATCH (iset{step_i})-[r{step_i}]-(neighbour{step_i})
+        WITH DISTINCT iset{step_i}, neighbour{step_i}, type(r{step_i}) AS rel_type{step_i}, r{step_i}, intermediate_set, final_pool
+        WITH iset{step_i}, neighbour{step_i}, rel_type{step_i}, vector.similarity.cosine(neighbour{step_i}.embedding, $embedding{step_i}) AS score{step_i}, intermediate_set, final_pool
+        ORDER BY score{step_i} DESC
+        LIMIT {k}
+        WITH collect({{
+            source: apoc.map.setKey(apoc.map.removeKey(apoc.map.removeKey(iset{step_i}, 'embedding'), 'external_id'), 'entity_type', labels(iset{step_i})[0]),
+            rel: rel_type{step_i},
+            target: apoc.map.setKey(apoc.map.removeKey(apoc.map.removeKey(neighbour{step_i}, 'embedding'), 'external_id'), 'entity_type', labels(neighbour{step_i})[0])
+        }}) AS new_triples,
+            collect(neighbour{step_i}) AS new_neighbours, intermediate_set, final_pool
+        WITH apoc.coll.toSet(final_pool + new_triples) AS final_pool,
+            apoc.coll.toSet(intermediate_set + new_neighbours) AS intermediate_set
+        """
