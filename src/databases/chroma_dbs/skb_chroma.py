@@ -91,7 +91,7 @@ class Chroma_DB:
 
         return results
 
-    def parse(self, skb: SKB, max_nodes: int = None, clear_previous: bool = True):
+    def parse(self, skb: SKB, max_nodes: int = None, clear_previous: bool = True, only_semantic: bool = True):
         if clear_previous:
             self.clear()
 
@@ -102,7 +102,7 @@ class Chroma_DB:
             if max_nodes is not None and i >= max_nodes:
                 break
 
-            semantic_fields = node.get_semantic()
+            semantic_fields = node.get_semantic() if only_semantic else node.get_textual()
             if not semantic_fields:
                 continue
 
@@ -131,14 +131,14 @@ class Chroma_DB:
         return text
 
 class Te3s_SKB(Chroma_DB):
-    def __init__(self):
+    def __init__(self, collection_name: str = "te3s"):
         super().__init__()
 
         self.embed_fnc = OpenAIEmbeddingFunction(
             api_key=OPENAI_API_KEY,
             model_name="text-embedding-3-small"
         )
-        self.collection_name = "te3s"
+        self.collection_name = collection_name
         self.load()
 
 class Glove_SKB(Chroma_DB):

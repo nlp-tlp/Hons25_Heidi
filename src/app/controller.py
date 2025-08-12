@@ -1,7 +1,7 @@
 import logging
 import yaml
 
-from retrievers import TextToCypherRetriever, PlannerRetriever
+from retrievers import TextToCypherRetriever, PlannerRetriever, NeighbourVectorRetriever
 from generators import FinalGenerator
 from llm import ChatClient, EmbeddingClient
 from databases import embedder_factory
@@ -67,6 +67,18 @@ def rag_query(question: str, strategy: str = "text_to_cypher",
 
             planning_routing_retriever = PlannerRetriever(client=chat_models[retriever_model], embedder=embedders[embedder])
             plan, last_results, error = planning_routing_retriever.retrieve(question=question)
+            if error:
+                return plan, last_results, "Error has occurred.", error
+
+            final_generator = FinalGenerator(client=chat_models[generator_model])
+            response = final_generator.generate(question=question, retrieved_nodes=last_results)
+            return plan, last_results, response, None
+        case "neighbour_vector":
+            extra_context = linker.get_linked_context(question=question)
+            embedder = EmbeddingClient(provider="openai", model="text-embedding-3-small")
+
+            neighbour_vector_retriever = NeighbourVectorRetriever(client=chat_models[retriever_model], embedding_client=embedder)
+            plan, last_results, error = neighbour_vector_retriever.retrieve(question=question)
             if error:
                 return plan, last_results, "Error has occurred.", error
 

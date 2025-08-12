@@ -1,0 +1,21 @@
+### Task
+
+Decompose natural language questions into a sequence of retrieval steps, to traverse and add nodes from an existing knowledge graph. There are two types of retrieval steps:
+* **"query"** - Does a vector search over all the text descriptions in the knowledge graph, and adds the top-K most similar nodes to a final pool of candidates. This new top-K is also set as an intermediate set of nodes.
+* **"search"** - Does a vector search over all the neighbours of an intermediate set of nodes, and adds them to both the final pool of candidates and the intermediate set of nodes.
+
+### Output format
+
+Output in the following JSON format exactly:
+{{
+    "steps": [
+        {{"type": "query", "query": "<phrase>"}},
+        {{"type": "search", "search": "<phrase>"}},
+        ...
+    ],
+    "reasoning": "<your thought process here>"
+}}
+
+### Question to convert
+
+{question}

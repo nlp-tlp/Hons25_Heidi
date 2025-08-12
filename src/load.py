@@ -23,8 +23,8 @@ def load_te3s_skb():
     skb_loaded = SKB(BarrickSchema)
     skb_loaded.load_pickle("databases/pkl/skb.pkl")
 
-    te3s_skb = Te3s_SKB()
-    te3s_skb.parse(skb_loaded)
+    te3s_skb = Te3s_SKB(collection_name="te3s_all")
+    te3s_skb.parse(skb_loaded, only_semantic=False)
 
 def load_glove_skb():
     skb_loaded = SKB(BarrickSchema)
@@ -49,8 +49,11 @@ def load_fuzzy_skb():
     fuzzy_skb.save_pickle("databases/other/fuzzy_types.pkl")
 
 def attach_chroma_embeddings_to_neo4j():
-    te3s_skb = Te3s_SKB()
+    te3s_skb = Te3s_SKB(collection_name="te3s_all")
     neo4j_skb = Neo4j_SKB()
 
     neo4j_skb.attach_chroma_embeddings(te3s_skb)
 
+def remove_embeddings_from_neo4j():
+    neo4j_skb = Neo4j_SKB()
+    neo4j_skb.remove_embeddings()
