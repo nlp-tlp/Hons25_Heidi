@@ -1,16 +1,16 @@
 import streamlit as st
 import json
 
-from controller import rag_query, get_chat_model_names
+from app.controller import rag_query, get_chat_model_names
 
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 
 st.title("Query Interface")
-st.markdown("This chat runs a **Text2Cypher** strategy. Given the user's question and some appended context, the configured LLM is made to create Cypher code to execute against the existing Neo4j database. After relevant information is retrieved, they are again passed to an LLM for generating a final response. This particular chat allows the use of some custom-defined functions.")
+st.markdown("This chat runs a **Vector Search + Neighbour Traversal** strategy. Given the user's question and some appended context, the configured LLM is made to create a JSON sequence that is compiled into an equivalent Cypher query, and executed against the existing Neo4j database. After relevant information is retrieved, they are again passed to an LLM for generating a final response.")
 
 # Chat and settings history
-if "chat_history_T2EC" not in st.session_state:
-    st.session_state.chat_history_T2EC = []
+if "chat_history_NV" not in st.session_state:
+    st.session_state.chat_history_NV = []
 
 # Sidebar model selection
 with st.sidebar:
@@ -42,7 +42,7 @@ with st.sidebar:
             st.success("Settings applied successfully. These will be used on your next query.")
 
 # Display chat history
-for entry in st.session_state.chat_history_T2EC:
+for entry in st.session_state.chat_history_NV:
     if "config" in entry:
         st.markdown(f"**Configuration:** Retriever: `{entry['config']['retriever_model']}` | Generator: `{entry['config']['generator_model']}`")
 
@@ -50,8 +50,8 @@ for entry in st.session_state.chat_history_T2EC:
         st.markdown(entry["msg"])
 
         if "cypher" in entry:
-            with st.expander("Show Extended Cypher Query"):
-                st.code(entry["cypher"], language="cypher", height=200)
+            with st.expander("Show Plan"):
+                st.code(json.dumps(entry["cypher"], indent=4), language="json", height=200)
 
         if "error" in entry:
             with st.expander("Show Error"):
@@ -75,14 +75,14 @@ if question:
 
             cypher_query, results, response, error = rag_query(
                 question=question,
-                strategy="text_to_cypher_extended",
+                strategy="neighbour_vector",
                 retriever_model=st.session_state.active_retriever_model,
                 generator_model=st.session_state.active_generator_model
             )
 
-    st.session_state.chat_history_T2EC.append({"role": "user", "msg": question})
+    st.session_state.chat_history_NV.append({"role": "user", "msg": question})
     if error:
-        st.session_state.chat_history_T2EC.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
+        st.session_state.chat_history_NV.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
     else:
-        st.session_state.chat_history_T2EC.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
+        st.session_state.chat_history_NV.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
     st.rerun()

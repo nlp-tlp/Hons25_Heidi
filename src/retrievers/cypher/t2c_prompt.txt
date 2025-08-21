@@ -12,5 +12,4 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Rules
 
-1. Any text property matches must be done with apoc.text.fuzzyMatch().
-2. Do not return node objects. Instead, return entity properties or aggregation aliases.
+1. Do not return node objects. Instead, return entity properties or aggregation aliases.

@@ -20,7 +20,6 @@ Output in the following JSON format exactly:
 
 {schema}
 
-
 ### Question to convert
 
 {question}

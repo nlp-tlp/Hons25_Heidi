@@ -2,8 +2,7 @@ import logging
 import re
 
 from llm import ChatClient, EmbeddingClient
-from databases import BarrickSchema
-from databases import Neo4j_SKB
+from databases import BarrickSchema, Neo4j_SKB
 
 PROMPT_PATH = "retrievers/cypher/t2c_prompt.txt"
 SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
