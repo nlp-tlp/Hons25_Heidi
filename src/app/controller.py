@@ -14,7 +14,6 @@ logging.basicConfig(
 
 CONFIG_PATH = "models.yaml"
 
-# Load available models from models.yaml
 chat_models = {}
 embedders = {}
 

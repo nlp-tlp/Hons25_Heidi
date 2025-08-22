@@ -12,12 +12,13 @@ NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 
 class Neo4j_DB:
-    def __init__(self):
+    def __init__(self, collection_name: str):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.driver = neo4j.GraphDatabase.driver(uri=NEO4J_URI, auth=NEO4J_AUTH)
+        self.database_name = collection_name
 
     def query(self, query: str, filter_ids: list[str] = None, other_params: dict[str, any] = None):
-        with self.driver.session() as session:
+        with self.driver.session(database=self.database_name) as session:
             params = {}
             if filter_ids:
                 params["ids"] = filter_ids
@@ -29,7 +30,7 @@ class Neo4j_DB:
             return [record.data() for record in result]
 
     def clear(self):
-        with self.driver.session() as session:
+        with self.driver.session(database=self.database_name) as session:
             session.run("MATCH (n) DETACH DELETE n")
 
     def template_insert_node(self, entity_label: str, props: dict[str, any]):
@@ -39,12 +40,11 @@ class Neo4j_DB:
     def template_insert_relation(self, from_label, rel_name, to_label):
         return f"MATCH (a:{from_label} {{external_id: $from_id}}) MATCH (b:{to_label} {{external_id: $to_id}}) MERGE (a)-[r:{rel_name.upper()}]->(b)"
 
-class Neo4j_SKB(Neo4j_DB):
     def parse(self, skb: SKB, max_entities: int = None, clear_previous: bool = True):
         if clear_previous:
             self.clear()
 
-        with self.driver.session() as session:
+        with self.driver.session(database=self.database_name) as session:
             # First pass: create entities
             for i, (node_id, node) in enumerate(skb.get_entities().items()):
                 if max_entities is not None and i >= max_entities:
@@ -90,7 +90,7 @@ class Neo4j_SKB(Neo4j_DB):
         """
 
         self.logger.info(f"Attaching embeddings from Chroma collection {chromadb.collection_name} to Neo4j database")
-        with self.driver.session() as session:
+        with self.driver.session(database=self.database_name) as session:
             session.run(cypher_query, batch=batch_data)
 
         self.logger.info(f"Finished attaching embeddings from Chroma collection {chromadb.collection_name} to Neo4j database")
@@ -103,7 +103,7 @@ class Neo4j_SKB(Neo4j_DB):
         """
 
         self.logger.info("Removing embeddings from Neo4j database")
-        with self.driver.session() as session:
+        with self.driver.session(database=self.database_name) as session:
             session.run(cypher_query)
 
         self.logger.info("Finished removing embeddings from Neo4j database")

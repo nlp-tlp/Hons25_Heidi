@@ -93,3 +93,27 @@ class SKB:
     def load_pickle(self, path: str):
         with open(path, "rb") as f:
             self.nodes = pickle.load(f)
+
+class SKBGraph:
+    def load_skb(self, skb_file: str):
+        self.skb = SKB(self.schema)
+        self.skb.load_pickle(skb_file)
+
+    def setup_chroma(self):
+        from databases import Chroma_DB
+        self.chroma = Chroma_DB(collection_name=self.name, embed_fnc=self.embedding_func)
+        self.chroma.parse(self.skb)
+
+    def load_chroma(self):
+        from databases import Chroma_DB
+        self.chroma = Chroma_DB(collection_name=self.name, embed_fnc=self.embedding_func)
+
+    def setup_neo4j(self):
+        from databases import Neo4j_DB
+        self.neo4j = Neo4j_DB(collection_name=self.name.replace("_", "-"))
+        self.neo4j.parse(self.skb)
+        self.neo4j.attach_chroma_embeddings(self.chroma)
+
+    def load_neo4j(self):
+        from databases import Neo4j_DB
+        self.neo4j = Neo4j_DB(collection_name=self.name.replace("_", "-"))

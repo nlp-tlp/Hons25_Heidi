@@ -17,15 +17,28 @@ CHROMA_DB_PATH = os.getenv("CHROMA_PATH")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 class Chroma_DB:
-    def __init__(self):
+    def __init__(self, collection_name: str, embed_fnc):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.client = PersistentClient(path=CHROMA_DB_PATH)
 
+        self.collection_name = collection_name
+        self.embed_fnc = embed_fnc
+
+        self.client = PersistentClient(path=CHROMA_DB_PATH)
         self.collection: Collection = None
-        self.collection_name: str = None
-        self.embed_fnc = None
+        self.load()
+
+    def load(self):
+        """Load existing database collection."""
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            embedding_function=self.embed_fnc,
+            metadata={"hnsw:space": "cosine"}
+        )
+
+        self.logger.info(f"Collection {self.collection_name} loaded with size {self.collection.count()}")
 
     def clear(self):
+        """Remove database collection."""
         if not self.collection:
             return
 
@@ -50,19 +63,8 @@ class Chroma_DB:
         # Re-initialise the collection
         self.load()
 
-    def load(self):
-        if not self.collection_name or not self.embed_fnc:
-            return
-
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name,
-            embedding_function=self.embed_fnc,
-            metadata={"hnsw:space": "cosine"}
-        )
-
-        self.logger.info(f"Collection {self.collection_name} loaded with size {self.collection.count()}")
-
     def query(self, query: str, k: int = 25, threshold: float = None, filter_entity: str = None, filter_ids: list[str] = None):
+        """Vector embedding search."""
         params = {}
         if filter_entity:
             params["where"] = {"type": filter_entity}
@@ -91,7 +93,8 @@ class Chroma_DB:
 
         return results
 
-    def parse(self, skb: SKB, max_nodes: int = None, clear_previous: bool = True, only_semantic: bool = True):
+    def parse(self, skb: SKB, max_nodes: int = None, clear_previous: bool = True, only_semantic: bool = False):
+        """Parse SKB content into Chroma database collection."""
         if clear_previous:
             self.clear()
 
@@ -106,7 +109,7 @@ class Chroma_DB:
             if not semantic_fields:
                 continue
 
-            text = " | ".join(self.normalise_string(v) for v in semantic_fields.values())
+            text = " | ".join(self.preprocess_string(v) for v in semantic_fields.values())
             meta = {"type": type(node).__name__}
 
             docs.append(text)
@@ -121,80 +124,56 @@ class Chroma_DB:
 
         self.logger.info(f"New collection size: {self.collection.count()}")
 
-    def normalise_string(self, text: str):
+    def preprocess_string(self, text: str):
         if not text:
             return ""
 
         text = text.lower()
-        text = text.rstrip(".,") # Lots of entries that end with comma or dot point
-        text = re.sub(r'\s+', ' ', text) # Some entries have double whitespaces
+        text = text.rstrip(".,") # Remove end with comma or dot point
+        text = re.sub(r'\s+', ' ', text) # Remove double whitespaces
         return text
 
-class Te3s_SKB(Chroma_DB):
-    def __init__(self, collection_name: str = "te3s"):
-        super().__init__()
-
-        self.embed_fnc = OpenAIEmbeddingFunction(
+class Te3sEmbeddingFunction(OpenAIEmbeddingFunction):
+    def __init__(self):
+        super().__init__(
             api_key=OPENAI_API_KEY,
             model_name="text-embedding-3-small"
         )
-        self.collection_name = collection_name
-        self.load()
 
-class Glove_SKB(Chroma_DB):
+class GloveEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(self):
-        super().__init__()
+        glove_embedding = WordEmbeddings("glove")
+        self.model = DocumentPoolEmbeddings([glove_embedding], pooling="mean")
 
-        self.embed_fnc = Glove_SKB.GloveEmbeddingFunction()
-        self.collection_name = "glove"
-        self.load()
+    def __call__(self, input: Documents) -> list[list[float]]:
+        if not input:
+            return []
 
-    class GloveEmbeddingFunction(EmbeddingFunction[Documents]):
-        def __init__(self):
-            glove_embedding = WordEmbeddings("glove")
-            self.model = DocumentPoolEmbeddings([glove_embedding], pooling="mean")
+        embeddings = []
+        for doc in input:
+            sentence = Sentence(doc)
+            self.model.embed(sentence)
+            embedding = sentence.embedding.detach().numpy()
+            embeddings.append(embedding)
+        return embeddings
 
-        def __call__(self, input: Documents) -> list[list[float]]:
-            if not input:
-                return []
-
-            embeddings = []
-            for doc in input:
-                sentence = Sentence(doc)
-                self.model.embed(sentence)
-
-                embedding = sentence.embedding.detach().numpy()
-                embeddings.append(embedding)
-
-            return embeddings
-
-class Flair_SKB(Chroma_DB):
+class FlairEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(self):
-        super().__init__()
+        stacked_flair_embedding = StackedEmbeddings([
+            WordEmbeddings("glove"),
+            FlairEmbeddings("news-forward"),
+            FlairEmbeddings("news-backward")
+        ])
+        self.model = DocumentPoolEmbeddings([stacked_flair_embedding], pooling="mean")
 
-        self.embed_fnc = Flair_SKB.FlairEmbeddingFunction()
-        self.collection_name = "flair"
-        self.load()
+    def __call__(self, input: Documents) -> list[list[float]]:
+        if not input:
+            return []
 
-    class FlairEmbeddingFunction(EmbeddingFunction[Documents]):
-        def __init__(self):
-            stacked_flair_embedding = StackedEmbeddings([
-                WordEmbeddings("glove"),
-                FlairEmbeddings("news-forward"),
-                FlairEmbeddings("news-backward")
-            ])
-            self.model = DocumentPoolEmbeddings([stacked_flair_embedding], pooling="mean")
-
-        def __call__(self, input: Documents) -> list[list[float]]:
-            if not input:
-                return []
-
-            embeddings = []
-            for doc in input:
-                sentence = Sentence(doc)
-                self.model.embed(sentence)
-
-                embedding = sentence.embedding.detach().numpy()
-                embeddings.append(embedding)
-
-            return embeddings
+        embeddings = []
+        for doc in input:
+            sentence = Sentence(doc)
+            self.model.embed(sentence)
+            embedding = sentence.embedding.detach().numpy()
+            embeddings.append(embedding)
+        return embeddings
