@@ -2,17 +2,14 @@ import streamlit as st
 import pandas as pd
 
 from llm import ChatClient, EmbeddingClient
-from scopes import PropertyTextScopeGraph, PropertyTextScopeRetriever
+from scopes import RowTextScopeGraph, RowTextScopeRetriever
 
-graph = PropertyTextScopeGraph()
+graph = RowTextScopeGraph()
 graph.load_neo4j()
 
-retriever = PropertyTextScopeRetriever(
+retriever = RowTextScopeRetriever(
     graph=graph,
-    prompt_path="scopes/property_text/t2c_prompt.txt",
-    allow_linking=False,
-    allow_extended=True,
-    allow_descriptive_only=True,
+    prompt_path="scopes/row_text/exc_text_prompt.txt",
     chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
     embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
 )
@@ -23,9 +20,8 @@ st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
 st.title("Execution Interface")
 st.markdown("This chat allows for the direct execution of Cypher queries in the form of the `Text2ExtendedCypher` chat, for testing manually written model RAG answers.")
 
-# Chat and settings history
-if "execution_history_property_text" not in st.session_state:
-    st.session_state.execution_history_property_text = []
+if "execution_history_row_text" not in st.session_state:
+    st.session_state.execution_history_row_text = []
 
 # Sidebar config selection
 with st.sidebar:
@@ -37,7 +33,7 @@ role_to_icon = {
     "assistant": ":material/list:"
 }
 
-for entry in st.session_state.execution_history_property_text:
+for entry in st.session_state.execution_history_row_text:
     with st.chat_message(entry["role"], avatar=role_to_icon[entry["role"]]):
         if entry["role"] == "user":
             st.code(entry["query"], wrap_lines=True, language="cypher")
@@ -60,9 +56,9 @@ if query:
             converted_query, results, error = retriever.execute_query(query=query.strip())
             results  = pd.DataFrame(results)
 
-    st.session_state.execution_history_property_text.append({"role": "user", "query": query})
+    st.session_state.execution_history_row_text.append({"role": "user", "query": query})
     if error:
-        st.session_state.execution_history_property_text.append({"role": "assistant", "error": error})
+        st.session_state.execution_history_row_text.append({"role": "assistant", "error": error})
     else:
-        st.session_state.execution_history_property_text.append({"role": "assistant", "results": results})
+        st.session_state.execution_history_row_text.append({"role": "assistant", "results": results})
     st.rerun()

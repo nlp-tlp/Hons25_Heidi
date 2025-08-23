@@ -13,10 +13,12 @@ pg = st.navigation({
         st.Page("chat_pages/chat_row_text.py", title="Row Text")
     ],
     "Embeddings": [
-        st.Page("embedding_pages/embedding_property_text.py", title="Property Text")
+        st.Page("embedding_pages/embedding_property_text.py", title="Property Text"),
+        st.Page("embedding_pages/embedding_row_text.py", title="Row Text")
     ],
     "Executions": [
-        st.Page("execution_pages/execution_property_text.py", title="Property Text")
+        st.Page("execution_pages/execution_property_text.py", title="Property Text"),
+        st.Page("execution_pages/execution_row_text.py", title="Row Text"),
     ]
 })
 

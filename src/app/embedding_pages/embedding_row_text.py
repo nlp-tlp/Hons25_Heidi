@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-from scopes import PropertyTextScopeGraph
+from scopes import RowTextScopeGraph
 
-graph = PropertyTextScopeGraph()
+graph = RowTextScopeGraph()
 graph.load_chroma()
 
 # Page
@@ -13,17 +13,17 @@ st.title("Vector Search Interface")
 st.markdown("This chat functions as a basic search for vector embeddings using cosine similarity. The embeddings are retrieved from an existing ChromaDB vector database. Current embeddings have been generated from the OpenAI `text-embedding-3-small` model.")
 
 # Chat and settings history
-if "embeddings_history_property_text" not in st.session_state:
-    st.session_state.embeddings_history_property_text = []
+if "embeddings_history_row_text" not in st.session_state:
+    st.session_state.embeddings_history_row_text = []
 
 # Sidebar config selection
 with st.sidebar:
     st.markdown ("### Configuration")
 
-    if "embeddings_property_text_k" not in st.session_state:
-        st.session_state.embeddings_property_text_k = 25
-    if "embeddings_property_text_threshold" not in st.session_state:
-        st.session_state.embeddings_property_text_threshold = None
+    if "embeddings_row_text_k" not in st.session_state:
+        st.session_state.embeddings_row_text_k = 25
+    if "embeddings_row_text_threshold" not in st.session_state:
+        st.session_state.embeddings_row_text_threshold = None
 
     with st.form("config_form", border=False, enter_to_submit=False):
         k_config = st.number_input(
@@ -43,8 +43,8 @@ with st.sidebar:
 
         submitted = st.form_submit_button("Apply settings for next submit")
         if submitted:
-            st.session_state.embeddings_property_text_k = k_config
-            st.session_state.embeddings_property_text_threshold = threshold_config
+            st.session_state.embeddings_row_text_k = k_config
+            st.session_state.embeddings_row_text_threshold = threshold_config
 
             st.success("Settings applied successfully. These will be used on your next query.")
 
@@ -59,7 +59,7 @@ def df_to_csv(df: pd.DataFrame):
     df["Content"] = df["Content"].astype(str).str.replace('\u00A0', ' ', regex=False)
     return df.to_csv().encode("utf-8")
 
-for i, entry in enumerate(st.session_state.embeddings_history_property_text):
+for i, entry in enumerate(st.session_state.embeddings_history_row_text):
     with st.chat_message(entry["role"], avatar=role_to_icon[entry["role"]]):
         if "config" in entry:
             st.markdown(f"**Configuration:** K: `{entry["config"]["k"]}` | Threshold: `{entry["config"]["threshold"]}`")
@@ -73,7 +73,7 @@ for i, entry in enumerate(st.session_state.embeddings_history_property_text):
                 key=i,
                 label="Download as CSV",
                 data=df_to_csv(df),
-                file_name="property_text.csv",
+                file_name="row_text.csv",
                 mime="text/csv",
                 icon=":material/download:"
             )
@@ -87,14 +87,14 @@ if search:
     with st.chat_message("assistant", avatar=":material/keyboard_return:"):
         with st.spinner("Searching..."):
             config_snapshot = {
-                "k": st.session_state.embeddings_property_text_k,
-                "threshold": st.session_state.embeddings_property_text_threshold
+                "k": st.session_state.embeddings_row_text_k,
+                "threshold": st.session_state.embeddings_row_text_threshold
             }
 
             records = graph.chroma.query(
                 query=search.strip(),
-                k=st.session_state.embeddings_property_text_k,
-                threshold=st.session_state.embeddings_property_text_threshold
+                k=st.session_state.embeddings_row_text_k,
+                threshold=st.session_state.embeddings_row_text_threshold
             )
 
             results = pd.DataFrame(
@@ -102,6 +102,6 @@ if search:
                 columns=["Type", "Content", "Score"]
             )
 
-    st.session_state.embeddings_history_property_text.append({"role": "user", "search": search})
-    st.session_state.embeddings_history_property_text.append({"role": "assistant", "results": results, "config": config_snapshot})
+    st.session_state.embeddings_history_row_text.append({"role": "user", "search": search})
+    st.session_state.embeddings_history_row_text.append({"role": "assistant", "results": results, "config": config_snapshot})
     st.rerun()
