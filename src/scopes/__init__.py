@@ -1,1 +1,2 @@
 from .property_text.property_text_scope import PropertyTextScopeGraph, PropertyTextScopeRetriever
+from .row_text.row_text_scope import RowTextScopeGraph, RowTextScopeRetriever

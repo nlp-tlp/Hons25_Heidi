@@ -13,8 +13,9 @@ pg = st.navigation({
         # st.Page("chat_pages/chat_text2cypher_nolink.py", title="Chat Text2Cypher (no-linking)"),
         # st.Page("chat_pages/chat_neighbourvector.py", title="Chat NeighbourVector"),
         # st.Page("chat_pages/chat_cyphervector_linear.py", title="Chat CypherVector (linear)")
+        st.Page("chat_pages/chat_vanilla_text2cypher.py", title="Vanilla Text-to-Cypher"),
         st.Page("chat_pages/chat_property_descriptive.py", title="Property Descriptive"),
-        st.Page("chat_pages/chat_vanilla_text2cypher.py", title="Vanilla Text-to-Cypher")
+        st.Page("chat_pages/chat_row_text.py", title="Row Text")
     ],
     "Embeddings": [
         # st.Page("embedding_pages/embeddings_te3s.py", title="Embedding Te3s"),

@@ -2,7 +2,7 @@ import logging
 import sys
 
 # from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, Fuzzy_SKB, SKB, BarrickSchema, load_from_barrick_csv
-from scopes import PropertyTextScopeGraph
+from scopes import PropertyTextScopeGraph, RowTextScopeGraph
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,7 +61,8 @@ logging.basicConfig(
 #     neo4j_skb.remove_embeddings()
 
 scope_graphs = {
-    "property_text": PropertyTextScopeGraph
+    "property_text": PropertyTextScopeGraph,
+    "row_text": RowTextScopeGraph
 }
 
 if __name__ == "__main__":

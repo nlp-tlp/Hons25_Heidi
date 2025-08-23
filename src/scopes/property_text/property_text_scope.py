@@ -80,13 +80,13 @@ class PropertyTextScopeGraph(SKBGraph):
                 fc_id = self.skb.add_entity(fc)
 
                 actions = []
-                controls_str = row["Current Controls"]
+                controls_str = row["Current Controls"].strip()
                 if controls_str:
                     controls = self.schema.CurrentControls(description=controls_str.strip())
                     controls_id = self.skb.add_entity(controls)
                     actions.append(controls_id)
 
-                recommended_str = row["Recommended Action"]
+                recommended_str = row["Recommended Action"].strip()
                 if recommended_str:
                     recommended = self.schema.RecommendedAction(description=recommended_str.strip())
                     recommended_id = self.skb.add_entity(recommended)
@@ -138,7 +138,7 @@ class PropertyTextScopeRetriever:
         self.logger.info(f"Generated Cypher: {query}")
 
         # Process extended functions and run command
-        return self.execute_query(query=query)
+        return self.execute_query(query)
 
     def generate_cypher(self, question: str, linker_context: str = ""):
         # Build prompt
@@ -171,7 +171,7 @@ class PropertyTextScopeRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return original_query, [], f"Error during Cypher execution: {e}"
 
-    def convert_extended_functions(self, query: str):
+    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.665):
         # Fuzzy match replacement
         if self.allow_descriptive_only:
             # Fuzzy match replacement
@@ -203,7 +203,7 @@ class PropertyTextScopeRetriever:
                 i += 1
 
                 with_clause += f", vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}"
-                new_where_clause = re.sub(rf"IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{similarity_var} > 0.665", new_where_clause)
+                new_where_clause = re.sub(rf"IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{similarity_var} > {semantic_threshold}", new_where_clause)
                 params[vector_placeholder] = vector
 
             query = query.replace(where_match.group(0), f"{with_clause} {new_where_clause}")
