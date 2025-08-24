@@ -1,2 +1,4 @@
 from .property_text.property_text_scope import PropertyTextScopeGraph, PropertyTextScopeRetriever
+from .concept_text.concept_text_scope import ConceptTextScopeGraph, ConceptTextScopeRetriever
 from .row_text.row_text_scope import RowTextScopeGraph, RowTextScopeRetriever
+from .row_all.row_all_scope import RowAllScopeGraph, RowAllScopeRetriever

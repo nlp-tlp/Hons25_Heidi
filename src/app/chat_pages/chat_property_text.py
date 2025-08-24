@@ -2,15 +2,21 @@ import streamlit as st
 import json
 
 from llm import ChatClient, EmbeddingClient
-from scopes import RowTextScopeGraph, RowTextScopeRetriever
+from scopes import PropertyTextScopeGraph, PropertyTextScopeRetriever
 from generators import FinalGenerator
 
-graph = RowTextScopeGraph()
+graph = PropertyTextScopeGraph()
 graph.load_neo4j()
 
-retriever = RowTextScopeRetriever(
+if "allow_linking" not in st.session_state:
+    st.session_state.allow_linking = True
+
+retriever = PropertyTextScopeRetriever(
     graph=graph,
-    prompt_path="scopes/row_text/exc_text_prompt.txt",
+    prompt_path="scopes/property_text/exc_text_prompt.txt",
+    allow_linking=st.session_state.allow_linking,
+    allow_extended=True,
+    allow_descriptive_only=False,
     chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
     embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
 )
@@ -23,8 +29,8 @@ st.title("Query Interface")
 st.markdown("This chat runs a **Text2Cypher** strategy. Given the user's question and some appended context, the configured LLM is made to create Cypher code to execute against the existing Neo4j database. After relevant information is retrieved, they are again passed to an LLM for generating a final response. This allows the use of some custom-defined functions.")
 
 # Chat and settings history
-if "chat_history_row_text" not in st.session_state:
-    st.session_state.chat_history_row_text = []
+if "chat_history_property_descriptive" not in st.session_state:
+    st.session_state.chat_history_property_descriptive = []
 
 # Sidebar model selection
 with st.sidebar:
@@ -35,10 +41,20 @@ with st.sidebar:
     if "active_generator_model" not in st.session_state:
         st.session_state.active_generator_model = "gpt-4.1-2025-04-14"
 
+    with st.form("config_form", border=False, enter_to_submit=False):
+        linking_config = st.checkbox("Use Entity Linking", value=True)
+
+        submitted = st.form_submit_button("Apply settings for next submit")
+        if submitted:
+            st.session_state.allow_linking = linking_config
+            retriever.allow_linking = linking_config
+
+            st.success("Settings applied successfully. These will be used on your next query.")
+
 # Display chat history
-for entry in st.session_state.chat_history_row_text:
+for entry in st.session_state.chat_history_property_descriptive:
     if "config" in entry:
-        st.markdown(f"**Configuration:** Retriever: `{entry['config']['retriever_model']}` | Generator: `{entry['config']['generator_model']}`")
+        st.markdown(f"**Configuration:** Retriever: `{entry['config']['retriever_model']}` | Generator: `{entry['config']['generator_model']}` | **Entity Linking:** `{"enabled" if entry["config"]["linking"] else "disabled"}`")
 
     with st.chat_message(entry["role"]):
         st.markdown(entry["msg"])
@@ -65,6 +81,7 @@ if question:
             config_snapshot = {
                 "retriever_model": st.session_state.active_retriever_model,
                 "generator_model": st.session_state.active_generator_model,
+                "linking": st.session_state.allow_linking
             }
 
             cypher_query, results, error = retriever.retrieve(question)
@@ -74,9 +91,9 @@ if question:
             else:
                 response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context())
 
-    st.session_state.chat_history_row_text.append({"role": "user", "msg": question})
+    st.session_state.chat_history_property_descriptive.append({"role": "user", "msg": question})
     if error:
-        st.session_state.chat_history_row_text.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
+        st.session_state.chat_history_property_descriptive.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
     else:
-        st.session_state.chat_history_row_text.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
+        st.session_state.chat_history_property_descriptive.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
     st.rerun()

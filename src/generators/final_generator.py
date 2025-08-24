@@ -1,11 +1,9 @@
 import logging
 
 from llm import ChatClient
-from databases import BarrickSchema
 
 # Prompts
 PROMPT_PATH = "generators/generator_prompt.txt"
-SCHEMA_CONTEXT = BarrickSchema.schema_to_jsonlike_str()
 
 # Generator
 class FinalGenerator:
@@ -16,7 +14,7 @@ class FinalGenerator:
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def generate(self, question: str, retrieved_nodes: list[dict]):
+    def generate(self, question: str, retrieved_nodes: list[dict], schema_context):
         # Cases to use prewritten answers
         if len(retrieved_nodes) == 0:
             self.logger.info("No nodes retrieved, returning pre-written response.")
@@ -31,7 +29,7 @@ class FinalGenerator:
         prompt = self.prompt.format(
             question=question,
             records=context_string,
-            schema=SCHEMA_CONTEXT
+            schema=schema_context
         )
         self.logger.debug(f"Prompting LLM using: {prompt}")
 

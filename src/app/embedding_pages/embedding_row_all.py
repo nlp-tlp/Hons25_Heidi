@@ -1,9 +1,9 @@
 from app.embedding_pages.helper import load_page, init_history, load_config, load_history, load_input
-from scopes import PropertyTextScopeGraph
+from scopes import RowAllScopeGraph
 
-graph = PropertyTextScopeGraph()
+graph = RowAllScopeGraph()
 graph.load_chroma()
-name = "property_text"
+name = "row_all"
 
 # Page
 load_page()

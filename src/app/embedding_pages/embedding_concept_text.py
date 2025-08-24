@@ -1,9 +1,9 @@
 from app.embedding_pages.helper import load_page, init_history, load_config, load_history, load_input
-from scopes import PropertyTextScopeGraph
+from scopes import ConceptTextScopeGraph
 
-graph = PropertyTextScopeGraph()
+graph = ConceptTextScopeGraph()
 graph.load_chroma()
-name = "property_text"
+name = "concept_text"
 
 # Page
 load_page()

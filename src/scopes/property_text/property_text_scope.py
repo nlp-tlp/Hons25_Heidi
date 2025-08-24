@@ -140,10 +140,14 @@ class PropertyTextScopeRetriever:
         # Process extended functions and run command
         return self.execute_query(query)
 
+    def schema_context(self):
+        tag_semantic = True if self.allow_descriptive_only else False
+        return self.graph.schema.schema_to_jsonlike_str(tag_semantic=tag_semantic, tag_uniqueness=True)
+
     def generate_cypher(self, question: str, linker_context: str = ""):
         # Build prompt
         prompt = self.prompt.format(
-            schema=self.graph.schema.schema_to_jsonlike_str(),
+            schema=self.schema_context(),
             question=question
         ) + linker_context
         self.logger.info(f"Prompting LLM using: {prompt}")

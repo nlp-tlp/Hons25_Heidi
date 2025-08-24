@@ -3,25 +3,28 @@ import csv
 import re
 from pydantic import Field
 
-
 from databases.pkl.skb import SKB, SKBSchema, SKBNode, SKBGraph
 from databases import Chroma_DB, Neo4j_DB, Te3sEmbeddingFunction
 from llm import ChatClient, EmbeddingClient
 
-class RowTextScopeSchema(SKBSchema):
-    class Row(SKBNode):
-        contents: str = Field(..., id=True, semantic=True)
-        occurrence: int = Field(..., id=True)
-        detection: int = Field(..., id=True)
-        rpn: int = Field(..., id=True)
-        severity: int = Field(..., id=True)
+class ConceptTextScopeSchema(SKBSchema):
+    class SystemComponent(SKBNode):
+        name: str = Field(..., id=True, semantic=True)
 
-class RowTextScopeGraph(SKBGraph):
+    class FailureOccurrence(SKBNode):
+        for_part: list[str] = Field(..., id=True, relation=True, dest="SystemComponent")
+        related_to: list[str] = Field(..., relation=True, dest="ControlAction")
+        description: str = Field(..., id=True, semantic=True)
+
+    class ControlAction(SKBNode):
+        description: str = Field(..., id=True, semantic=True)
+
+class ConceptTextScopeGraph(SKBGraph):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.schema = RowTextScopeSchema
-        self.name = "row_text"
+        self.schema = ConceptTextScopeSchema
+        self.name = "concept_text"
         self.embedding_func = Te3sEmbeddingFunction()
 
         self.skb: SKB = None
@@ -37,20 +40,38 @@ class RowTextScopeGraph(SKBGraph):
                 if max_rows is not None and i >= max_rows:
                     break
 
-                row_text = f"Subsystem: {row["Subsystem"].strip()} | Component: {row["Component"].strip()} | SubComponent: {row["Sub-Component"]} | FailureMode: {row["Potential Failure Mode"].strip()} | FailureEffect: {row["Potential Effect(s) of Failure"].strip()} | FailureCause: {row["Potential Cause(s) of Failure"].strip()} | CurrentControls: {row["Current Controls"].strip()} | RecommendedAction: {row["Recommended Action"].strip()}"
-                row = self.schema.Row(
-                    contents=row_text,
-                    occurrence=int(row["Occurrence"]),
-                    detection=int(row["Detection"]),
-                    rpn=int(row["RPN"]),
-                    severity=int(row["Severity"])
+                system_text = f"Subsystem: {row["Subsystem"].strip()} | Component: {row["Component"].strip()} | SubComponent: {row["Sub-Component"]}"
+                system = self.schema.SystemComponent(name=system_text)
+                system_id = self.skb.add_entity(system)
+
+
+                controls_str = row["Current Controls"].strip()
+                recommended_str = row["Recommended Action"].strip()
+                control_text = ""
+                if controls_str:
+                    control_text += f"CurrentControls: {controls_str}"
+                if recommended_str:
+                    control_text += " | " if controls_str else ""
+                    control_text += f"RecommendedAction: {recommended_str}"
+
+                actions = []
+                if controls_str or recommended_str:
+                    control = self.schema.ControlAction(description=control_text)
+                    control_id = self.skb.add_entity(control)
+                    actions.append(control_id)
+
+                failure_text = f"FailureMode: {row["Potential Failure Mode"].strip()} | FailureEffect: {row["Potential Effect(s) of Failure"].strip()} | FailureCause: {row["Potential Cause(s) of Failure"].strip()}"
+                failure = self.schema.FailureOccurrence(
+                    for_part=[system_id],
+                    related_to=actions,
+                    description=failure_text
                 )
-                self.skb.add_entity(row)
+                self.skb.add_entity(failure)
 
         self.skb.save_pickle(outpath)
 
-class RowTextScopeRetriever:
-    def __init__(self, graph: RowTextScopeGraph, prompt_path: str,
+class ConceptTextScopeRetriever:
+    def __init__(self, graph: ConceptTextScopeGraph, prompt_path: str,
         chat_client: ChatClient, embedding_client: EmbeddingClient
     ):
         self.logger = logging.getLogger(self.__class__.__name__)

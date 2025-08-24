@@ -5,7 +5,7 @@ import json
 
 class SKBSchema:
     @classmethod
-    def schema_to_jsonlike(cls):
+    def schema_to_jsonlike(cls, tag_uniqueness: bool = True, tag_semantic: bool = True):
         schema_dict = {}
         for name, cls in vars(cls).items():
             if not (isinstance(cls, type) and issubclass(cls, SKBNode)):
@@ -20,9 +20,9 @@ class SKBSchema:
                     field_name = field_name.upper()
                     meta.pop()
                     meta.append(f"relation_to {field.json_schema_extra.get('dest')}")
-                if field.json_schema_extra.get("id"):
+                if tag_uniqueness and field.json_schema_extra.get("id"):
                     meta.append("@informs_uniqueness")
-                if field.json_schema_extra.get("semantic"):
+                if tag_semantic and field.json_schema_extra.get("semantic"):
                     meta.append("@match_semantically")
 
                 entity_dict[field_name] = ' '.join(meta)
@@ -32,8 +32,8 @@ class SKBSchema:
         return schema_dict
 
     @classmethod
-    def schema_to_jsonlike_str(cls):
-        return json.dumps(cls.schema_to_jsonlike(), indent=4).replace('"', '')
+    def schema_to_jsonlike_str(cls, tag_uniqueness: bool = True, tag_semantic: bool = True):
+        return json.dumps(cls.schema_to_jsonlike(tag_uniqueness, tag_semantic), indent=4).replace('"', '')
 
 class SKBNode(BaseModel):
     def get_props(self) -> dict[str, any]:

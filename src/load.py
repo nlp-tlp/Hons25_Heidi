@@ -1,8 +1,7 @@
 import logging
 import sys
 
-# from databases import Neo4j_SKB, Te3s_SKB, Glove_SKB, Flair_SKB, Fuzzy_SKB, SKB, BarrickSchema, load_from_barrick_csv
-from scopes import PropertyTextScopeGraph, RowTextScopeGraph
+from scopes import PropertyTextScopeGraph, ConceptTextScopeGraph, RowTextScopeGraph, RowAllScopeGraph
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,7 +10,9 @@ logging.basicConfig(
 
 scope_graphs = {
     "property_text": PropertyTextScopeGraph,
-    "row_text": RowTextScopeGraph
+    "concept_text": ConceptTextScopeGraph,
+    "row_text": RowTextScopeGraph,
+    "row_all": RowAllScopeGraph
 }
 
 if __name__ == "__main__":
@@ -36,6 +37,10 @@ if __name__ == "__main__":
             scope_graph.load_skb(skb_file=f"databases/pkl/{scope}.pkl")
             scope_graph.setup_chroma()
         case "neo4j":
+            if scope == "row_all":
+                print("Not allowed for row_all")
+                exit(1)
+
             scope_graph.load_skb(skb_file=f"databases/pkl/{scope}.pkl")
             scope_graph.load_chroma()
             scope_graph.setup_neo4j()
