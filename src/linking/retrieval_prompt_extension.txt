@@ -1,0 +1,3 @@
+### Entity candidates
+
+Here are some already fuzzy matched entities from the knowledge base, from some mentions in the question. Pick which ones to use, as they are not always relevant. There may be a single match that is best, but if multiple are plausible given the query then make sure to cover all of the plausible.

@@ -120,7 +120,7 @@ class PropertyTextScopeRetriever:
         self.graph = graph
         self.chat_client = chat_client
         self.embedding_client = embedding_client
-        self.linker = EntityLinker(client=ChatClient(provider="openai", model="gpt-4.1-mini-2025-04-14"))
+        self.linker = EntityLinker(client=ChatClient(provider="openai", model="gpt-4.1-mini-2025-04-14"), graph=self.graph)
 
         with open(prompt_path) as f:
             self.prompt = f.read()

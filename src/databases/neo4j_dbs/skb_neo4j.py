@@ -107,3 +107,15 @@ class Neo4j_DB:
             session.run(cypher_query)
 
         self.logger.info("Finished removing embeddings from Neo4j database")
+
+    def ftsearch(self, query: str):
+        """Full-text search for fuzzy partial matching"""
+        split_text = [f"{s}~" for s in query.split()]
+        cypher_query = f"""
+        CALL db.index.fulltext.queryNodes("names", "{" OR ".join(split_text)}")
+        YIELD node, score
+        WHERE score > 1
+        RETURN apoc.text.join(LABELS(node), ", ") AS EntityType, COALESCE(node.name, node.description) AS TextValue, ROUND(score, 2) AS FullTextScore
+        LIMIT 4
+        """
+        return self.query(cypher_query)
