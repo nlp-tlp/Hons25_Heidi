@@ -44,6 +44,10 @@ if __name__ == "__main__":
             scope_graph.load_skb(skb_file=f"databases/pkl/{scope}.pkl")
             scope_graph.load_chroma()
             scope_graph.setup_neo4j()
+        case "schema":
+            tag_semantic = False
+            tag_uniqueness = True if scope == "property_text" or scope == "concept_text" else False
+            print(scope_graph.schema.schema_to_jsonlike_str(tag_semantic, tag_uniqueness))
         case default:
             print("Unrecognised action")
             exit(1)

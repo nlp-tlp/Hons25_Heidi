@@ -15,6 +15,10 @@ class ConceptTextScopeSchema(SKBSchema):
         for_part: list[str] = Field(..., id=True, relation=True, dest="SystemComponent")
         related_to: list[str] = Field(..., relation=True, dest="ControlAction")
         description: str = Field(..., id=True, semantic=True)
+        occurrence: int = Field(..., id=True)
+        detection: int = Field(..., id=True)
+        rpn: int = Field(..., id=True)
+        severity: int = Field(..., id=True)
 
     class ControlAction(SKBNode):
         description: str = Field(..., id=True, semantic=True)
@@ -44,7 +48,6 @@ class ConceptTextScopeGraph(SKBGraph):
                 system = self.schema.SystemComponent(name=system_text)
                 system_id = self.skb.add_entity(system)
 
-
                 controls_str = row["Current Controls"].strip()
                 recommended_str = row["Recommended Action"].strip()
                 control_text = ""
@@ -64,7 +67,11 @@ class ConceptTextScopeGraph(SKBGraph):
                 failure = self.schema.FailureOccurrence(
                     for_part=[system_id],
                     related_to=actions,
-                    description=failure_text
+                    description=failure_text,
+                    occurrence=int(row["Occurrence"]),
+                    detection=int(row["Detection"]),
+                    rpn=int(row["RPN"]),
+                    severity=int(row["Severity"])
                 )
                 self.skb.add_entity(failure)
 

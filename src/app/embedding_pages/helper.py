@@ -19,6 +19,8 @@ def load_config(name):
             st.session_state[f"embeddings_{name}_k"] = 25
         if f"embeddings_{name}_threshold" not in st.session_state:
             st.session_state[f"embeddings_{name}_threshold"] = None
+        if f"embeddings_{name}_allownames" not in st.session_state:
+            st.session_state[f"embeddings_{name}_allownames"] = False
 
         with st.form("config_form", border=False, enter_to_submit=False):
             k_config = st.number_input(
@@ -36,10 +38,16 @@ def load_config(name):
                 placeholder="None",
             )
 
+            allownames_config = st.checkbox(
+                "Include names",
+                value=False
+            )
+
             submitted = st.form_submit_button("Apply settings for next submit")
             if submitted:
                 st.session_state[f"embeddings_{name}_k"] = k_config
                 st.session_state[f"embeddings_{name}_threshold"] = threshold_config
+                st.session_state[f"embeddings_{name}_allownames"] = allownames_config
 
                 st.success("Settings applied successfully. These will be used on your next query.")
 
@@ -89,7 +97,8 @@ def load_input(name, graph):
                 records = graph.chroma.query(
                     query=search.strip(),
                     k=st.session_state[f"embeddings_{name}_k"],
-                    threshold=st.session_state[f"embeddings_{name}_threshold"]
+                    threshold=st.session_state[f"embeddings_{name}_threshold"],
+                    filter_entities=None if st.session_state[f"embeddings_{name}_allownames"] else ["FailureMode", "FailureEffect", "FailureCause", "RecommendedAction", "CurrentControls", "FailureOccurrence", "ControlAction", "Row"]
                 )
 
                 results = pd.DataFrame(

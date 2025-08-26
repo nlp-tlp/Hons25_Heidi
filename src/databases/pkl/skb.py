@@ -5,7 +5,7 @@ import json
 
 class SKBSchema:
     @classmethod
-    def schema_to_jsonlike(cls, tag_uniqueness: bool = True, tag_semantic: bool = True):
+    def schema_to_jsonlike(cls, tag_semantic: bool = True, tag_uniqueness: bool = True):
         schema_dict = {}
         for name, cls in vars(cls).items():
             if not (isinstance(cls, type) and issubclass(cls, SKBNode)):
@@ -19,7 +19,7 @@ class SKBSchema:
                 if field.json_schema_extra.get("relation"):
                     field_name = field_name.upper()
                     meta.pop()
-                    meta.append(f"relation_to {field.json_schema_extra.get('dest')}")
+                    meta.append(f"@relation_to {field.json_schema_extra.get('dest')}")
                 if tag_uniqueness and field.json_schema_extra.get("id"):
                     meta.append("@informs_uniqueness")
                 if tag_semantic and field.json_schema_extra.get("semantic"):

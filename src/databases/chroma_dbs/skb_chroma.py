@@ -63,11 +63,11 @@ class Chroma_DB:
         # Re-initialise the collection
         self.load()
 
-    def query(self, query: str, k: int = 25, threshold: float = None, filter_entity: str = None, filter_ids: list[str] = None):
+    def query(self, query: str, k: int = 25, threshold: float = None, filter_entities: list[str] = None, filter_ids: list[str] = None):
         """Vector embedding search."""
         params = {}
-        if filter_entity:
-            params["where"] = {"type": filter_entity}
+        if filter_entities:
+            params["where"] = {"type": {"$in": filter_entities}}
         if filter_ids:
             params["ids"] = filter_ids
 
