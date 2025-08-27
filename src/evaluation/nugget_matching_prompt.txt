@@ -1,0 +1,29 @@
+You are an evaluator. You are given:
+* A list of nuggets extracted from the model answer (each essential or optional).
+* A generated answer from the system.
+
+For each nugget, output it again and decide if it is:
+* MATCHED (present in the generated answer with correct meaning)
+* MISSING (missing from the generated answer)
+* INCORRECT (nugget is contradicted or distorted)
+
+Also identify any EXTRA information in the generated answer that is not in the nuggets as a list. Only identify information related to the answer, and not any conversational phrases or generic statements that do not provide factual information e.g. "If you need more details let me know". Do not include repetitions, only unique pieces of information, rephrased to its core information.
+
+Input Nuggets:
+{model_nuggets}
+
+Generated Answer:
+{generated_answer}
+
+Question the answers are for:
+{question}
+
+Output format:
+{{
+  "nugget_results": [
+    {{"nugget": "...", "status": "ESSENTIAL", "match": "MATCHED"}},
+    {{"nugget": "...", "status": "ESSENTIAL", "match": "MISSING"}},
+    {{"nugget": "...", "status": "OPTIONAL", "match": "INCORRECT"}}
+  ],
+  "extra_claims": ["...", "..."]
+}}

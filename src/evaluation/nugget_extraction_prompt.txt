@@ -1,0 +1,19 @@
+You are an evaluator. Break the following model answer into a list of atomic "nuggets" - small, self-contained facts or operations that are required to answer the question. Each nugget should be one minimal piece of information. Do not include repetitions, only unique pieces of information, rephrased to its core information.
+
+Mark each nugget as:
+* ESSENTIAL (must be present for correctness)
+* OPTIONAL (nice to have, but not required)
+
+Question:
+{question}
+
+Model Answer:
+{model_answer}
+
+Output format:
+{{
+    "nuggets": [
+        {{"nugget": "...", "status": "ESSENTIAL"}},
+        {{"nugget": "...", "status": "OPTIONAL"}}
+    ]
+}}

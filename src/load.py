@@ -48,6 +48,6 @@ if __name__ == "__main__":
             tag_semantic = False
             tag_uniqueness = True if scope == "property_text" or scope == "concept_text" else False
             print(scope_graph.schema.schema_to_jsonlike_str(tag_semantic, tag_uniqueness))
-        case default:
+        case _:
             print("Unrecognised action")
             exit(1)
