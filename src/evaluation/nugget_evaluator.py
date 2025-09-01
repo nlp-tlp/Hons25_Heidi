@@ -50,7 +50,7 @@ class QASet:
 
             cypher_query, retrieved_records, error = retriever.retrieve(question)
             if error:
-                rag_run.append({"ID": question_id, "Query": cypher_query, "Final_Response": "EXECUTION ERROR"})
+                rag_run.append({"ID": question_id, "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
                 continue
             final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context())
 
@@ -98,6 +98,15 @@ class QASet:
         for run_entry, model_entry in zip(df_run, df_model):
             question = model_entry["Question"]
             candidate_answer = run_entry["Final_Response"]
+
+            if candidate_answer[:15] == "EXECUTION ERROR":
+                results.append({
+                    "Nugget_Results": None,
+                    "Extra_Claims": None,
+                    "Precision": 0,
+                    "Recall": 0
+                })
+                continue
 
             prompt = self.nugget_matching_prompt.format(
                 question=question,

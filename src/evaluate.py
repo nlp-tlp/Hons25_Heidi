@@ -10,8 +10,8 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
-    if not len(sys.argv) == 3 or len(sys.argv) == 4:
-        print("Incorrect number of arguments")
+    if not len(sys.argv) == 3 and not len(sys.argv) == 4:
+        print(f"Incorrect number of arguments: {len(sys.argv)}")
         exit(1)
 
     strategy = sys.argv[1]
@@ -26,12 +26,15 @@ if __name__ == "__main__":
     action = sys.argv[2]
     match action:
         case "nugget":
+            print("Running nugget extraction for model answers.")
             qa_set.run_extract_nuggets()
         case "rag":
-            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
+            print(f"Running RAG run for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"" if allow_linking else "_nolink"}.xlsx"
             qa_set.run_rag(retriever, run_file_path)
         case "eval":
-            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
+            print(f"Running evaluation of RAG run for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"" if allow_linking else "_nolink"}.xlsx"
             qa_set.run_match_nuggets(run_file_path)
         case _:
             print("Unrecognised action")

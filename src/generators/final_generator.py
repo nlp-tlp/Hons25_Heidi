@@ -1,4 +1,5 @@
 import logging
+import tiktoken
 
 from llm import ChatClient
 
@@ -20,12 +21,14 @@ class FinalGenerator:
             self.logger.info("No nodes retrieved, returning pre-written response.")
             return "No records could be found. Either the answer is that there are no such entities, or that the context given was insufficient to retrieve the right records. If you believe it is the latter, try rephrasing your question."
 
-        if len(retrieved_nodes) > 50:
-            self.logger.info(f"Too many nodes retrieved: {len(retrieved_nodes)}, returning pre-written response.")
+        context_string = "\n".join([str(r) for r in retrieved_nodes]) if retrieved_nodes else "No relevant records found."
+        enc = tiktoken.get_encoding("o200k_base") # tokeniser for gpt-4.1
+        num_tokens = len(enc.encode(context_string))
+        if num_tokens > 5000:
+            self.logger.info(f"Too much information retrieved: {len(retrieved_nodes)} nodes with {num_tokens} tokens, returning pre-written response.")
             return "Too many records were retrieved. Either the answer contains that many entities, or the model gave a bad plan of retrieval. If you believe it is the latter, try entering the question again."
 
         # Build prompt
-        context_string = "\n".join([str(r) for r in retrieved_nodes]) if retrieved_nodes else "No relevant records found."
         prompt = self.prompt.format(
             question=question,
             records=context_string,

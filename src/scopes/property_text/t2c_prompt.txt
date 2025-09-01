@@ -1,6 +1,6 @@
 ### Task
 
-Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
+Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
 
 ### Neo4j graph schema
 
@@ -12,4 +12,14 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Rules
 
-1. Do not return node objects. Instead, return entity properties or aggregation aliases.
+1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
+2. Do not return node objects. Return entity properties or aggregation aliases.
+3. All exact text matches must pay attention to case.
+
+### Few-shot examples
+
+Question: What is the average RPN for failure modes in the Power Supply subsystem?
+Cypher:
+MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)
+WHERE subsystem.name = 'Power Supply'
+RETURN subsystem.name, component.name, subcomponent.name, AVG(failuremode.rpn), COUNT(failuremode.rpn)

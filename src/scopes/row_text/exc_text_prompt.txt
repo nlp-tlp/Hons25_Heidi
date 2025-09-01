@@ -1,6 +1,6 @@
 ### Task
 
-Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
+Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
 
 ### Neo4j graph schema
 
@@ -18,5 +18,21 @@ Aside from existing Cypher functions and syntax, make use the additional functio
 
 ### Rules
 
-1. Any text property matches must be done with above extended function.
-2. Do not return node objects. Instead, return entity properties or aggregation aliases.
+1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
+2. Do not return node objects. Return entity properties or aggregation aliases.
+3. Any text property matches must be done with the above extended function.
+
+### Few-shot examples
+
+Question: What is the average RPN for failure modes in the power supply?
+Cypher:
+MATCH (row:Row)
+WHERE IS_SEMANTIC_MATCH(row.description, 'power supply')
+RETURN row.description
+
+Question: What are the failure modes in the Communication subsystem, which have recommended actions involving the prevention of contamination?
+Cypher:
+MATCH (row:Row)
+WHERE IS_SEMANTIC_MATCH(row.description, 'communication')
+    AND IS_SEMANTIC_MATCH(row.description, 'prevention of contamination')
+RETURN row.description

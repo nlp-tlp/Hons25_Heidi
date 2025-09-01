@@ -175,11 +175,13 @@ class PropertyTextScopeRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return original_query, [], f"Error during Cypher execution: {e}"
 
-    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.665):
+    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.6418):
+        query = self.remove_brackets_in_strings(query)
+
         # Fuzzy match replacement
         if self.allow_descriptive_only:
             # Fuzzy match replacement
-            query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.fuzzyMatch(\1, \2)", query)
+            query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.levenshteinSimilarity(\1, \2) > 0.65", query)
 
         # Semantic match replacement
         where_matches = list(re.finditer(
@@ -214,3 +216,14 @@ class PropertyTextScopeRetriever:
 
         self.logger.info(f"Converted query to: {query}")
         return query, params
+
+    def remove_brackets_in_strings(self, text: str):
+        # Matches single- or double-quoted strings
+        string_pattern = re.compile(r"(['\"])(.*?)(\1)", re.DOTALL)
+
+        def replacer(match):
+            quote, content, end = match.groups()
+            escaped_content = content.replace("(", "").replace(")", "")
+            return f"{quote}{escaped_content}{end}"
+
+        return string_pattern.sub(replacer, text)

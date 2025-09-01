@@ -102,7 +102,7 @@ class RowTextScopeRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return original_query, [], f"Error during Cypher execution: {e}"
 
-    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.665):
+    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.65):
         # Semantic match replacement
         where_matches = list(re.finditer(
             r"(WHERE\s+)(.*?)(?=\s+(RETURN|WITH|ORDER BY|SKIP|LIMIT|MATCH|UNWIND|CALL|CREATE|MERGE|SET|DELETE|REMOVE|FOREACH|LOAD CSV|OPTIONAL MATCH|$))",

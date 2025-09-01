@@ -12,27 +12,28 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Extended Cypher functions
 
-Aside from existing Cypher functions and syntax, make use the additional functions below where necessary. Any text property matches must be done with these functions in WHERE clauses, instead of typical exact matches.
+Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches. Do not use them in other clauses e.g. CASE clauses.
 
-1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for fitering string fields that do not have the @match_semantically tag.
+1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for filtering string fields that do not have the @match_semantically tag.
 2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
 
 ### Rules
 
-1. Any text property matches must be done with one of the above extended functions, chosen depending on the @match_semantically tag.
-2. Do not return node objects. Instead, return entity properties or aggregation aliases.
+1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
+2. Do not return node objects. Return entity properties or aggregation aliases.
+3. Any text property matches must be done with the above extended function.
 
 ### Few-shot examples
 
-Question: What is the average RPN for failure modes in the fuel pump?
+Question: What is the average RPN for failure modes in the power supply?
 Cypher:
 MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)
-WHERE IS_FUZZY_MATCH(subcomponent.name, 'fuel pump')
+WHERE IS_FUZZY_MATCH(subcomponent.name, 'power supply')
 RETURN subsystem.name, component.name, subcomponent.name, AVG(failuremode.rpn), COUNT(failuremode.rpn)
 
-Question: What are the failure modes in the Power Train subsystem, which have recommended actions related to lubrication?
+Question: What are the failure modes in the Communication subsystem, which have recommended actions involving the prevention of contamination?
 Cypher:
 MATCH (subsystem:Subsystem)<-[:PART_OF]-(component:Component)<-[:PART_OF]-(subcomponent:SubComponent)<-[:FOR_PART]-(failuremode:FailureMode)-[:HAS_ACTION]->(recommendedaction:RecommendedAction)
-WHERE IS_FUZZY_MATCH(subsystem.name, 'power train')
-    AND IS_SEMANTIC_MATCH(recommendedaction.description, 'lubrication')
+WHERE IS_FUZZY_MATCH(subsystem.name, 'communication')
+    AND IS_SEMANTIC_MATCH(recommendedaction.description, 'prevention of contamination')
 RETURN subsystem.name, component.name, subcomponent.name, failuremode.description, recommendedaction.description

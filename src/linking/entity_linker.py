@@ -44,6 +44,7 @@ class EntityLinker:
 
     def get_linked_context(self, question: str):
         extraction = self.extract(question)
+        extraction = [e.replace("(", "").replace(")", "") for e in extraction]
         matches = self.fuzzy_search(extraction)
 
         return f"\n{self.retrieval_prompt_extension}\n\n{matches}"

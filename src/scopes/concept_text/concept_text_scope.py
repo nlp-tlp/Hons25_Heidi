@@ -130,7 +130,9 @@ class ConceptTextScopeRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return original_query, [], f"Error during Cypher execution: {e}"
 
-    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.665):
+    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.667):
+        query = self.remove_brackets_in_strings(query)
+
         # Semantic match replacement
         where_matches = list(re.finditer(
             r"(WHERE\s+)(.*?)(?=\s+(RETURN|WITH|ORDER BY|SKIP|LIMIT|MATCH|UNWIND|CALL|CREATE|MERGE|SET|DELETE|REMOVE|FOREACH|LOAD CSV|OPTIONAL MATCH|$))",
@@ -164,3 +166,14 @@ class ConceptTextScopeRetriever:
 
         self.logger.info(f"Converted query to: {query}")
         return query, params
+
+    def remove_brackets_in_strings(self, text: str):
+        # Matches single- or double-quoted strings
+        string_pattern = re.compile(r"(['\"])(.*?)(\1)", re.DOTALL)
+
+        def replacer(match):
+            quote, content, end = match.groups()
+            escaped_content = content.replace("(", "").replace(")", "")
+            return f"{quote}{escaped_content}{end}"
+
+        return string_pattern.sub(replacer, text)
