@@ -15,7 +15,7 @@ class FinalGenerator:
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def generate(self, question: str, retrieved_nodes: list[dict], schema_context):
+    def generate(self, question: str, retrieved_nodes: list[dict], schema_context: str, cypher_query: str = None, linker_list: str = None):
         # Cases to use prewritten answers
         if len(retrieved_nodes) == 0:
             self.logger.info("No nodes retrieved, returning pre-written response.")
@@ -34,7 +34,14 @@ class FinalGenerator:
             records=context_string,
             schema=schema_context
         )
-        self.logger.debug(f"Prompting LLM using: {prompt}")
+        if cypher_query:
+            print("AAAA")
+            prompt += f"\n### Retrieval query\n\nBelow is the query that was used by your retrieval counterpart, which was instructed to give you enough context to answer the provided question:\n\n{cypher_query}\n"
+        if linker_list:
+            print("BBBB")
+            prompt += f"\n### Entity linking\n\nThis RAG strategy also involved using entity linking. This fuzzy matched list of entities was provided to the retriever before they generated the cypher query. They were instructed to pick critically.\n\nThe user asking the question may be mistaken about the right type, in which case it would be helpful to retrieve for another type that contains a very similar name. The user may also link together names that should be split across multiple entity types, in which case they were asked to check combinations of entities that make up the right names:\n\n{linker_list}"
+
+        self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate final response from LLM
         final_response = self.client.chat(prompt=prompt)

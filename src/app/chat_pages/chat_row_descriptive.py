@@ -10,10 +10,10 @@ graph.load_neo4j()
 
 retriever = RowTextScopeRetriever(
     graph=graph,
-    prompt_path="scopes/row_text/exc_text_prompt.txt",
+    prompt_path="scopes/row_text/exc_descriptive_prompt.txt",
     chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
     embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
-    allow_descriptive_only=False
+    allow_descriptive_only=True
 )
 generator = FinalGenerator(client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"))
 
@@ -24,8 +24,8 @@ st.title("Query Interface")
 st.markdown("This chat runs a **Text2Cypher** strategy. Given the user's question and some appended context, the configured LLM is made to create Cypher code to execute against the existing Neo4j database. After relevant information is retrieved, they are again passed to an LLM for generating a final response. This allows the use of some custom-defined functions.")
 
 # Chat and settings history
-if "chat_history_row_text" not in st.session_state:
-    st.session_state.chat_history_row_text = []
+if "chat_history_row_descriptive" not in st.session_state:
+    st.session_state.chat_history_row_descriptive = []
 
 # Sidebar model selection
 with st.sidebar:
@@ -37,7 +37,7 @@ with st.sidebar:
         st.session_state.active_generator_model = "gpt-4.1-2025-04-14"
 
 # Display chat history
-for entry in st.session_state.chat_history_row_text:
+for entry in st.session_state.chat_history_row_descriptive:
     if "config" in entry:
         st.markdown(f"**Configuration:** Retriever: `{entry['config']['retriever_model']}` | Generator: `{entry['config']['generator_model']}`")
 
@@ -75,9 +75,9 @@ if question:
             else:
                 response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context(), cypher_query=cypher_query)
 
-    st.session_state.chat_history_row_text.append({"role": "user", "msg": question})
+    st.session_state.chat_history_row_descriptive.append({"role": "user", "msg": question})
     if error:
-        st.session_state.chat_history_row_text.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
+        st.session_state.chat_history_row_descriptive.append({"role": "assistant", "msg": response, "cypher": cypher_query, "error": error, "config": config_snapshot})
     else:
-        st.session_state.chat_history_row_text.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
+        st.session_state.chat_history_row_descriptive.append({"role": "assistant", "msg": response, "cypher": cypher_query, "raw": results, "config": config_snapshot})
     st.rerun()

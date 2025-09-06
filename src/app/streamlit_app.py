@@ -11,7 +11,9 @@ pg = st.navigation({
         st.Page("chat_pages/chat_vanilla_text2cypher.py", title="Vanilla Text-to-Cypher"),
         st.Page("chat_pages/chat_property_descriptive.py", title="Property Descriptive"),
         st.Page("chat_pages/chat_property_text.py", title="Property Text"),
+        st.Page("chat_pages/chat_concept_descriptive.py", title="Concept Descriptive"),
         st.Page("chat_pages/chat_concept_text.py", title="Concept Text"),
+        st.Page("chat_pages/chat_row_descriptive.py", title="Row Descriptive"),
         st.Page("chat_pages/chat_row_text.py", title="Row Text"),
         st.Page("chat_pages/chat_vanilla_vectorsearch.py", title="Vanilla Vector-Search")
     ],

@@ -9,19 +9,19 @@ from llm import ChatClient, EmbeddingClient
 
 class ConceptTextScopeSchema(SKBSchema):
     class SystemComponent(SKBNode):
-        name: str = Field(..., id=True, semantic=True)
+        name: str = Field(..., id=True, concats_fields="Subsystem, Component, SubComponent")
 
     class FailureOccurrence(SKBNode):
         for_part: list[str] = Field(..., id=True, relation=True, dest="SystemComponent")
         related_to: list[str] = Field(..., relation=True, dest="ControlAction")
-        description: str = Field(..., id=True, semantic=True)
+        description: str = Field(..., id=True, semantic=True, concats_fields="FailureMode, FailureEffect, FailureCause")
         occurrence: int = Field(..., id=True)
         detection: int = Field(..., id=True)
         rpn: int = Field(..., id=True)
         severity: int = Field(..., id=True)
 
     class ControlAction(SKBNode):
-        description: str = Field(..., id=True, semantic=True)
+        description: str = Field(..., id=True, semantic=True, concats_fields="CurrentControls, RecommendedAction")
 
 class ConceptTextScopeGraph(SKBGraph):
     def __init__(self):
@@ -79,9 +79,12 @@ class ConceptTextScopeGraph(SKBGraph):
 
 class ConceptTextScopeRetriever:
     def __init__(self, graph: ConceptTextScopeGraph, prompt_path: str,
+        allow_descriptive_only: bool,
         chat_client: ChatClient, embedding_client: EmbeddingClient
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
+
+        self.allow_descriptive_only = allow_descriptive_only
 
         self.graph = graph
         self.chat_client = chat_client
@@ -101,7 +104,8 @@ class ConceptTextScopeRetriever:
         return self.execute_query(query)
 
     def schema_context(self):
-        return self.graph.schema.schema_to_jsonlike_str(tag_semantic=False, tag_uniqueness=False)
+        tag_semantic = True if self.allow_descriptive_only else False
+        return self.graph.schema.schema_to_jsonlike_str(tag_semantic=tag_semantic, tag_uniqueness=True)
 
     def generate_cypher(self, question: str):
         # Build prompt
@@ -130,8 +134,40 @@ class ConceptTextScopeRetriever:
             self.logger.error(f"Error running Cypher: {e}")
             return original_query, [], f"Error during Cypher execution: {e}"
 
-    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.667):
-        query = self.remove_brackets_in_strings(query)
+    def convert_extended_functions(self, query: str, semantic_threshold: float = 0.6670, fuzzy_threshold: float = 0.56):
+        query = self.escape_parens_in_strings(query)
+
+        # Fuzzy match replacement
+        if self.allow_descriptive_only:
+            # query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.jaroWinklerDistance(\1, \2) < 0.48", query)
+
+            fuzzy_matches = list(re.finditer(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", query))
+            fuzzy_subqueries = []
+            fuzzy_var_names = []
+            for i, match in enumerate(fuzzy_matches, 1):
+                target = match.group(1).strip()
+                target_entity = target.split('.')[0]
+                search_phrase = match.group(2)[1:-1].replace("__LPAREN__", "").replace("__RPAREN__", "") # full-text matching doesn't work with brackets
+
+                split_text = [f"{s}~" for s in search_phrase.split()]
+                fuzzy_list_var = f"fuzzy_list_{i}"
+                fuzzy_score_var = f"fuzzy_score_{i}"
+
+                # Subquery to collect matching nodes
+                subquery = (
+                    f"CALL () {{\n"
+                    f"  CALL db.index.fulltext.queryNodes('names', '{' OR '.join(split_text)}')\n"
+                    f"  YIELD node AS node_{i}, score AS {fuzzy_score_var}\n"
+                    f"  WHERE {fuzzy_score_var} > {fuzzy_threshold}\n"
+                    f"  RETURN collect(node_{i}) AS {fuzzy_list_var}\n"
+                    f"}}"
+                )
+                fuzzy_subqueries.append(subquery)
+                fuzzy_var_names.append((target_entity, fuzzy_list_var))
+
+            def fuzzy_in_replacer(match):
+                target, fuzzy_list_var = fuzzy_var_names.pop(0)
+                return f"{target} IN {fuzzy_list_var}"
 
         # Semantic match replacement
         where_matches = list(re.finditer(
@@ -140,6 +176,8 @@ class ConceptTextScopeRetriever:
             re.IGNORECASE | re.DOTALL
         ))
         if not where_matches:
+            query = self.unescape_parens_in_strings(query)
+            self.logger.info(f"Converted query to: {query}")
             return query, None
 
         i = 1
@@ -162,18 +200,31 @@ class ConceptTextScopeRetriever:
                 new_where_clause = re.sub(rf"IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{similarity_var} > {semantic_threshold}", new_where_clause)
                 params[vector_placeholder] = vector
 
-            query = query.replace(where_match.group(0), f"{with_clause} {new_where_clause}")
+            if semantic_matches:
+                query = query.replace(where_match.group(0), f"{with_clause} {new_where_clause}")
 
+        # Needs to be here to avoid triggering the semantic matching regex
+        if fuzzy_matches:
+            query = re.sub(
+                r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)",
+                fuzzy_in_replacer,
+                query
+            )
+            query = "\n".join(fuzzy_subqueries) + "\n" + query
+
+        query = self.unescape_parens_in_strings(query)
         self.logger.info(f"Converted query to: {query}")
         return query, params
 
-    def remove_brackets_in_strings(self, text: str):
-        # Matches single- or double-quoted strings
+    def escape_parens_in_strings(self, text: str):
         string_pattern = re.compile(r"(['\"])(.*?)(\1)", re.DOTALL)
 
         def replacer(match):
             quote, content, end = match.groups()
-            escaped_content = content.replace("(", "").replace(")", "")
+            escaped_content = content.replace("(", "__LPAREN__").replace(")", "__RPAREN__")
             return f"{quote}{escaped_content}{end}"
 
         return string_pattern.sub(replacer, text)
+
+    def unescape_parens_in_strings(self, text: str):
+        return text.replace("__LPAREN__", "(").replace("__RPAREN__", ")")

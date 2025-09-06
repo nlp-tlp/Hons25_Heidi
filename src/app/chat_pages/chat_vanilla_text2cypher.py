@@ -89,7 +89,8 @@ if question:
             if error:
                 response = "Error has occurred."
             else:
-                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context())
+                linker_list = retriever.linker.linker_list_prev if st.session_state.allow_linking else ""
+                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context(), cypher_query=cypher_query, linker_list=linker_list)
 
     st.session_state.chat_history_t2c.append({"role": "user", "msg": question})
     if error:

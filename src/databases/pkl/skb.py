@@ -19,11 +19,13 @@ class SKBSchema:
                 if field.json_schema_extra.get("relation"):
                     field_name = field_name.upper()
                     meta.pop()
-                    meta.append(f"@relation_to {field.json_schema_extra.get('dest')}")
-                if tag_uniqueness and field.json_schema_extra.get("id"):
+                    meta.append(f"@relation_to({field.json_schema_extra.get('dest')})")
+                if tag_uniqueness and "id" in field.json_schema_extra:
                     meta.append("@informs_uniqueness")
-                if tag_semantic and field.json_schema_extra.get("semantic"):
+                if tag_semantic and "semantic" in field.json_schema_extra:
                     meta.append("@match_semantically")
+                if "concats_fields" in field.json_schema_extra:
+                    meta.append(f"@concats_fields({field.json_schema_extra['concats_fields']})")
 
                 entity_dict[field_name] = ' '.join(meta)
 

@@ -12,7 +12,8 @@ retriever = ConceptTextScopeRetriever(
     graph=graph,
     prompt_path="scopes/concept_text/exc_text_prompt.txt",
     chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
-    embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
+    embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+    allow_descriptive_only=False
 )
 generator = FinalGenerator(client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"))
 
@@ -71,7 +72,7 @@ if question:
             if error:
                 response = "Error has occurred."
             else:
-                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context())
+                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context(), cypher_query=cypher_query)
 
     st.session_state.chat_history_concept_text.append({"role": "user", "msg": question})
     if error:

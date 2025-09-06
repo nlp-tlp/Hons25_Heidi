@@ -50,14 +50,14 @@ class QASet:
 
             cypher_query, retrieved_records, error = retriever.retrieve(question)
             if error:
-                rag_run.append({"ID": question_id, "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
+                rag_run.append({"ID": question_id, "Question": question, "Model_Answer": entry["Answer"], "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
                 continue
             final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context())
 
             retrieved_records_str = "\n".join([str(r) for r in retrieved_records])
             retrieved_records_length = self.metric_tok_length(retrieved_records_str)
 
-            rag_run.append({"ID": question_id, "Query": cypher_query, "Final_Response": final_response, "Retrieved_Tok_Length": retrieved_records_length})
+            rag_run.append({"ID": question_id, "Question": question, "Model_Answer": entry["Answer"], "Query": cypher_query, "Final_Response": final_response, "Retrieved_Tok_Length": retrieved_records_length})
 
         df = pd.DataFrame(rag_run)
         df.to_excel(run_file_path, index=False)
@@ -140,8 +140,9 @@ class QASet:
         matched_essential = sum(1 for n in essential if n["match"] == "MATCHED")
         matched_optional = sum(1 for n in optional if n["match"] == "MATCHED")
 
-        # Recall - Only ESSENTIAL nuggets matter
-        recall = matched_essential / len(essential) if essential else 1.0
+        # Recall - ESSENTIAL nuggets + penalise for incorrect OPTIONAL matches
+        incorrect_optional = sum(1 for n in optional if n["match"] == "INCORRECT")
+        recall = matched_essential / (len(essential) + incorrect_optional) if essential else 1.0
 
         # Precision - ESSENTIAL matches + weighted OPTIONAL matches
         total_matched = matched_essential + optional_weight * matched_optional

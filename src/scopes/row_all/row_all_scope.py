@@ -50,7 +50,7 @@ class RowAllScopeRetriever:
         self.chat_client = chat_client
         self.embedding_client = embedding_client
 
-    def retrieve(self, question: str, k=15, threshold=None):
+    def retrieve(self, question: str, k=25, threshold=None):
         self.logger.info(f"Question given: {question}")
 
         # No Cypher generation here - just a vector search

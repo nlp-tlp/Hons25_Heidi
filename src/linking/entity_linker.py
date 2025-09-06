@@ -15,6 +15,8 @@ class EntityLinker:
         self.client = client
         self.graph = graph
 
+        self.linker_list_prev = None
+
         with open(prompt_path) as f:
             self.prompt = f.read()
 
@@ -47,4 +49,5 @@ class EntityLinker:
         extraction = [e.replace("(", "").replace(")", "") for e in extraction]
         matches = self.fuzzy_search(extraction)
 
+        self.linker_list_prev = matches
         return f"\n{self.retrieval_prompt_extension}\n\n{matches}"

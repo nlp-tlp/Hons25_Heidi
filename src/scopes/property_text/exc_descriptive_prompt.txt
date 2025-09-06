@@ -12,7 +12,7 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Extended Cypher functions
 
-Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches. Do not use them in other clauses e.g. CASE clauses.
+Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches.
 
 1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for filtering string fields that do not have the @match_semantically tag.
 2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
@@ -22,6 +22,8 @@ Aside from existing Cypher functions and syntax, make use the additional functio
 1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
 2. Do not return node objects. Return entity properties or aggregation aliases.
 3. Any text property matches must be done with the above extended function.
+4. Only use the text matching functions in WHERE clauses, and not others like CASE clauses.
+5. This is a FMEA dataset. Provide all system/ component names when identifying specific failure modes.
 
 ### Few-shot examples
 

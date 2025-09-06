@@ -30,11 +30,11 @@ if __name__ == "__main__":
             qa_set.run_extract_nuggets()
         case "rag":
             print(f"Running RAG run for strategy: {strategy}, entity linking: {allow_linking}")
-            run_file_path = f"evaluation/experiment_runs/{strategy}{"" if allow_linking else "_nolink"}.xlsx"
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
             qa_set.run_rag(retriever, run_file_path)
         case "eval":
             print(f"Running evaluation of RAG run for strategy: {strategy}, entity linking: {allow_linking}")
-            run_file_path = f"evaluation/experiment_runs/{strategy}{"" if allow_linking else "_nolink"}.xlsx"
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
             qa_set.run_match_nuggets(run_file_path)
         case _:
             print("Unrecognised action")

@@ -72,7 +72,7 @@ class Chroma_DB:
             params["ids"] = filter_ids
 
         query_result: QueryResult = self.collection.query(
-            query_texts=[query.lower()],
+            query_texts=[query.strip().lower()],
             n_results=k,
             **params
         )

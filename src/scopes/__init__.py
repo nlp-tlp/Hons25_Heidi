@@ -24,7 +24,7 @@ def retriever_factory(name: str, allow_linking: bool):
             graph.load_neo4j()
             return PropertyTextScopeRetriever(
                 graph=graph,
-                prompt_path="scopes/property_text/exc_descriptive_prompt_fewshot.txt",
+                prompt_path="scopes/property_text/exc_descriptive_prompt.txt",
                 allow_linking=allow_linking,
                 allow_extended=True,
                 allow_descriptive_only=True,
@@ -43,6 +43,16 @@ def retriever_factory(name: str, allow_linking: bool):
                 chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
                 embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
             )
+        case "concept_descriptive":
+            graph = ConceptTextScopeGraph()
+            graph.load_neo4j()
+            return ConceptTextScopeRetriever(
+                graph=graph,
+                prompt_path="scopes/concept_text/exc_descriptive_prompt.txt",
+                chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
+                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+                allow_descriptive_only=True
+            )
         case "concept_text":
             graph = ConceptTextScopeGraph()
             graph.load_neo4j()
@@ -50,7 +60,18 @@ def retriever_factory(name: str, allow_linking: bool):
                 graph=graph,
                 prompt_path="scopes/concept_text/exc_text_prompt.txt",
                 chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
-                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
+                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+                allow_descriptive_only=False
+            )
+        case "row_descriptive":
+            graph = RowTextScopeGraph()
+            graph.load_neo4j()
+            return RowTextScopeRetriever(
+                graph=graph,
+                prompt_path="scopes/row_text/exc_text_prompt.txt",
+                chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
+                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+                allow_descriptive_only=True
             )
         case "row_text":
             graph = RowTextScopeGraph()
@@ -59,7 +80,8 @@ def retriever_factory(name: str, allow_linking: bool):
                 graph=graph,
                 prompt_path="scopes/row_text/exc_text_prompt.txt",
                 chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
-                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
+                embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+                allow_descriptive_only=False
             )
         case "baseline_vectorsearch":
             graph = RowAllScopeGraph()

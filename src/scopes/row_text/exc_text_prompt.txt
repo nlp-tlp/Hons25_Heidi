@@ -21,6 +21,9 @@ Aside from existing Cypher functions and syntax, make use the additional functio
 1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
 2. Do not return node objects. Return entity properties or aggregation aliases.
 3. Any text property matches must be done with the above extended function.
+4. Only use the text matching functions in WHERE clauses, and not others like CASE clauses.
+5. Split the query into modular search terms that each represent a distinct idea, only keeping closely bound ideas together, so they can be matched independently with consistent thresholds.
+6. This is a FMEA dataset. Provide all system/ component names when identifying specific failure modes.
 
 ### Few-shot examples
 
