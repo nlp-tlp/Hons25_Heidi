@@ -15,6 +15,7 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
 2. Do not return node objects. Return entity properties or aggregation aliases.
 3. All exact text matches must pay attention to case.
+4. This is a FMEA dataset. Provide all system/ component names when identifying specific failure modes.
 
 ### Few-shot examples
 

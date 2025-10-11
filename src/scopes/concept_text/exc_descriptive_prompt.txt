@@ -15,7 +15,7 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches.
 
 1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for filtering string fields that do not have the @match_semantically tag.
-2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.2
+2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
 
 ### Rules
 

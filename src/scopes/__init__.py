@@ -3,6 +3,20 @@ from .concept_text.concept_text_scope import ConceptTextScopeGraph, ConceptTextS
 from .row_text.row_text_scope import RowTextScopeGraph, RowTextScopeRetriever
 from .row_all.row_all_scope import RowAllScopeGraph, RowAllScopeRetriever
 
+retriever_choices = [
+    {"name": "baseline_text2cypher", "allow_linking": True},
+    {"name": "baseline_text2cypher", "allow_linking": False},
+    {"name": "property_descriptive", "allow_linking": True},
+    {"name": "property_descriptive", "allow_linking": False},
+    {"name": "property_text", "allow_linking": True},
+    {"name": "property_text", "allow_linking": False},
+    {"name": "concept_descriptive", "allow_linking": False},
+    {"name": "concept_text", "allow_linking": False},
+    {"name": "row_descriptive", "allow_linking": False},
+    {"name": "row_text", "allow_linking": False},
+    {"name": "baseline_vectorsearch", "allow_linking": False},
+]
+
 def retriever_factory(name: str, allow_linking: bool):
     from llm import ChatClient, EmbeddingClient
 
@@ -68,7 +82,7 @@ def retriever_factory(name: str, allow_linking: bool):
             graph.load_neo4j()
             return RowTextScopeRetriever(
                 graph=graph,
-                prompt_path="scopes/row_text/exc_text_prompt.txt",
+                prompt_path="scopes/row_text/exc_descriptive_prompt.txt",
                 chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
                 embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
                 allow_descriptive_only=True

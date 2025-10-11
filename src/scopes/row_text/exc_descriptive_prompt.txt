@@ -4,6 +4,8 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Neo4j graph schema
 
+Here is the schema. Note that the @concats_fields tag only specifies what content is in that property, and are not themselves properties that can be matched against. Do not match against them as properties.
+
 {schema}
 
 ### Question to convert
@@ -14,8 +16,8 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches.
 
-1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for filtering string fields that do not have the @match_semantically tag.
-2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.2
+1. IS_FUZZY_MATCH(text_property, "text_to_match"): Filters for concepts using full-text partial fuzzy matching, will match for mispellings and alternative spellings.
+2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Filters for concepts using vector thresholding, will match for synonymous phrases.
 
 ### Rules
 

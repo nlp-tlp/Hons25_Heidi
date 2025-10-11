@@ -10,7 +10,8 @@ retriever = RowTextScopeRetriever(
     graph=graph,
     prompt_path="scopes/row_text/exc_text_prompt.txt",
     chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
-    embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small")
+    embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
+    allow_descriptive_only=True
 )
 
 # Page

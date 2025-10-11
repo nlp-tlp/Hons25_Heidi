@@ -132,6 +132,32 @@ class QASet:
         df_final = pd.concat([pd.DataFrame(df_run), df_results], axis=1)
         df_final.to_excel(run_file_path, index=False)
 
+    # For running after human nugget evaluation fixing
+    def run_metrics_only(self, run_file_path: str):
+        df_run = pd.read_excel(run_file_path).to_dict(orient="records")
+
+        metrics = []
+        for run_entry in df_run:
+            nuggets = run_entry["Nugget_Results"]
+            extra = run_entry["Extra_Claims"]
+
+            if not nuggets or not isinstance(nuggets, str):
+                metrics.append({
+                    "Precision": 0,
+                    "Recall": 0
+                })
+                continue
+
+            precision, recall = self.nugget_metrics(json.loads(nuggets), json.loads(extra))
+            metrics.append({
+                "Precision": precision,
+                "Recall": recall
+            })
+
+        df_metrics = pd.DataFrame(metrics)
+        df_final = pd.concat([pd.DataFrame(df_run), df_metrics], axis=1)
+        df_final.to_excel(run_file_path, index=False)
+
     def nugget_metrics(self, nugget_results, extra_claims, optional_weight=0.3):
         # Counts
         essential = [n for n in nugget_results if n["status"] == "ESSENTIAL"]

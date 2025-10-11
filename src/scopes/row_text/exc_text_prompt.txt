@@ -4,6 +4,8 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Neo4j graph schema
 
+Here is the schema. Note that the @concats_fields tag only specifies what content is in that property, and are not themselves properties that can be matched against. Do not match against them as properties.
+
 {schema}
 
 ### Question to convert

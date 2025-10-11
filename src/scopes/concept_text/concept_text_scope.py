@@ -138,16 +138,15 @@ class ConceptTextScopeRetriever:
         query = self.escape_parens_in_strings(query)
 
         # Fuzzy match replacement
+        fuzzy_matches = []
         if self.allow_descriptive_only:
-            # query = re.sub(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", r"apoc.text.jaroWinklerDistance(\1, \2) < 0.48", query)
-
             fuzzy_matches = list(re.finditer(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", query))
             fuzzy_subqueries = []
             fuzzy_var_names = []
             for i, match in enumerate(fuzzy_matches, 1):
                 target = match.group(1).strip()
                 target_entity = target.split('.')[0]
-                search_phrase = match.group(2)[1:-1].replace("__LPAREN__", "").replace("__RPAREN__", "") # full-text matching doesn't work with brackets
+                search_phrase = match.group(2)[1:-1].replace("__LPAREN__", "").replace("__RPAREN__", "")
 
                 split_text = [f"{s}~" for s in search_phrase.split()]
                 fuzzy_list_var = f"fuzzy_list_{i}"
@@ -155,7 +154,7 @@ class ConceptTextScopeRetriever:
 
                 # Subquery to collect matching nodes
                 subquery = (
-                    f"CALL () {{\n"
+                    f"\nCALL () {{\n"
                     f"  CALL db.index.fulltext.queryNodes('names', '{' OR '.join(split_text)}')\n"
                     f"  YIELD node AS node_{i}, score AS {fuzzy_score_var}\n"
                     f"  WHERE {fuzzy_score_var} > {fuzzy_threshold}\n"
@@ -188,8 +187,9 @@ class ConceptTextScopeRetriever:
             with_clause = "WITH *"
             new_where_clause = where_match.group(0)
             for target, search_phrase in semantic_matches:
-                self.logger.info(f"Processing semantic match for: {search_phrase}")
-                vector = self.embedding_client.embed(search_phrase.strip())
+                search_phrase_clean = search_phrase[1:-1] # take off apostrophes
+                self.logger.info(f"Processing semantic match for: {search_phrase_clean}")
+                vector = self.embedding_client.embed(search_phrase_clean.strip().lower())
 
                 vector_placeholder = f"vector_{i}"
                 similarity_var = f"similarity_{i}"
@@ -205,12 +205,45 @@ class ConceptTextScopeRetriever:
 
         # Needs to be here to avoid triggering the semantic matching regex
         if fuzzy_matches:
-            query = re.sub(
-                r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)",
-                fuzzy_in_replacer,
-                query
-            )
-            query = "\n".join(fuzzy_subqueries) + "\n" + query
+            # Split query on UNION (preserving UNIONs)
+            union_parts = re.split(r'(\s+UNION\s+)', query, flags=re.IGNORECASE)
+            if len(union_parts) > 1:
+                rebuilt_query = ""
+                fuzzy_pattern = r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)"
+
+                fuzzy_var_names_copy = fuzzy_var_names.copy()  # To avoid mutation issues
+
+                for idx in range(0, len(union_parts), 2):
+                    branch = union_parts[idx]
+                    union = union_parts[idx+1] if idx+1 < len(union_parts) else ""
+
+                    branch_fuzzy_matches = list(re.finditer(fuzzy_pattern, branch))
+                    branch_fuzzy_subqueries = []
+                    branch_fuzzy_var_names = []
+
+                    for i, match in enumerate(branch_fuzzy_matches, 1):
+                        target_entity, fuzzy_list_var = fuzzy_var_names_copy.pop(0)
+                        branch_fuzzy_var_names.append((target_entity, fuzzy_list_var))
+                        branch_fuzzy_subqueries.append(fuzzy_subqueries.pop(0))
+
+                    def branch_fuzzy_in_replacer(match):
+                        target, fuzzy_list_var = branch_fuzzy_var_names.pop(0)
+                        return f"{target} IN {fuzzy_list_var}"
+
+                    # Replace fuzzy matches in branch
+                    if branch_fuzzy_matches:
+                        branch = re.sub(fuzzy_pattern, branch_fuzzy_in_replacer, branch)
+                        branch = "\n".join(branch_fuzzy_subqueries) + branch
+
+                    rebuilt_query += branch + union
+                query = rebuilt_query
+            else:
+                query = re.sub(
+                    r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)",
+                    fuzzy_in_replacer,
+                    query
+                )
+                query = "\n".join(fuzzy_subqueries) + "\n" + query
 
         query = self.unescape_parens_in_strings(query)
         self.logger.info(f"Converted query to: {query}")
