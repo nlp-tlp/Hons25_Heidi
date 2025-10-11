@@ -1,57 +1,62 @@
 import logging
+import sys
 
-from llm import ChatClient, EmbeddingClient
-from retrievers import TextToCypherRetriever
-from evaluation import PlanOutputEvaluator, test_row_metrics, test_col_metrics
-from linking import EntityLinker
+from scopes import retriever_factory, retriever_choices
+from evaluation import QASet
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.CRITICAL,
     format="\n=== %(levelname)s [%(name)s] ===\n%(message)s\n"
 )
 
-MODEL_ANSWERS_FILEPATH = "evaluation/model_answers/extended_cypher_model_answers.json"
-GENERATED_ANSWERS_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t3.json"
-METRICS_STORE_FILEPATH = "evaluation/experiment_runs/extended_cypher_run_t3metrics.csv"
-
-def eval_t2ce(generate: bool = True, evaluate: bool = True,):
-    # Initialise
-    chat_client = ChatClient(provider="openai", model="gpt-4.1-2025-04-14")
-    embedder_client = EmbeddingClient(provider="openai", model="text-embedding-3-small")
-    t2c_retriever = TextToCypherRetriever(client=chat_client, prompt_path="retrievers/cypher/extended_cypher_prompt_fewshot.txt", embedding_client=embedder_client)
-
-    # RAG component functions
-    linker = EntityLinker(client=ChatClient(provider="openai", model="gpt-4.1-mini-2025-04-14"))
-    def generator_function(question: str) -> str:
-        extra_context = linker.get_linked_context(question=question)
-        query = t2c_retriever.generate_cypher(question=question, extra_context=extra_context)
-        return query
-
-    def executor_function(query: str) -> list[dict[str, any]]:
-        _original_query, output, _error = t2c_retriever.execute_query(query=query, extended_cypher=True)
-
-        if _error:
-            raise Exception()
-
-        return output
-
-    # Evaluate
-    evaluator = PlanOutputEvaluator(mapper_client=chat_client)
-    if generate:
-        evaluator.generate(
-            plan_generation_function=generator_function,
-            model_answers_filepath=MODEL_ANSWERS_FILEPATH,
-            generated_answers_filepath=GENERATED_ANSWERS_FILEPATH
-        )
-    if evaluate:
-        evaluator.evaluate(
-            plan_execution_function=executor_function,
-            model_answers_filepath=MODEL_ANSWERS_FILEPATH,
-            generated_answers_filepath=GENERATED_ANSWERS_FILEPATH,
-            metrics_filepath=METRICS_STORE_FILEPATH
-        )
-
 if __name__ == "__main__":
-    eval_t2ce(generate=True, evaluate=True)
-    # test_row_metrics()
-    # test_col_metrics()
+    # For looping through all evaluation options
+    if len(sys.argv) == 2 and sys.argv[1] == "loop_all":
+        qa_set = QASet()
+        for choice in retriever_choices:
+            strategy = choice["name"]
+            allow_linking = choice.get("allow_linking", False)
+            retriever = retriever_factory(strategy, allow_linking)
+            if not retriever:
+                print(f"Unrecognised strategy: {strategy}")
+                continue
+            print(f"Running RAG for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{'_link' if allow_linking else ''}.xlsx"
+            qa_set.run_rag(retriever, run_file_path)
+            print(f"Running evaluation for strategy: {strategy}, entity linking: {allow_linking}")
+            qa_set.run_match_nuggets(run_file_path)
+        exit(0)
+
+    if not len(sys.argv) == 3 and not len(sys.argv) == 4:
+        print(f"Incorrect number of arguments: {len(sys.argv)}")
+        exit(1)
+
+    strategy = sys.argv[1]
+    allow_linking = True if len(sys.argv) == 4 else False
+    retriever = retriever_factory(strategy, allow_linking)
+    if not retriever:
+        print("Unrecognised strategy")
+        exit(1)
+
+    qa_set = QASet()
+
+    action = sys.argv[2]
+    match action:
+        case "nugget":
+            print("Running nugget extraction for model answers.")
+            qa_set.run_extract_nuggets()
+        case "rag":
+            print(f"Running RAG run for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
+            qa_set.run_rag(retriever, run_file_path)
+        case "eval":
+            print(f"Running evaluation of RAG run for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
+            qa_set.run_match_nuggets(run_file_path)
+        case "metric":
+            print(f"Running metric calculation of created nuggets run for strategy: {strategy}, entity linking: {allow_linking}")
+            run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
+            qa_set.run_metrics_only(run_file_path)
+        case _:
+            print("Unrecognised action")
+            exit(1)

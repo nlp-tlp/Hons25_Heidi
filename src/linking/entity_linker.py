@@ -2,21 +2,26 @@ import logging
 import json
 
 from llm import ChatClient
-from databases import Fuzzy_SKB
+from databases import Neo4j_DB
 
-PROMPT_PATH = "linking/linker_prompt.txt"
+LINKER_PROMPT_PATH = "linking/linker_prompt.txt"
+RETRIEVAL_PROMPT_EXTENSION = "linking/retrieval_prompt_extension.txt"
 
 # Linker
 class EntityLinker:
-    def __init__(self, client: ChatClient, prompt_path: str = PROMPT_PATH):
+    def __init__(self, client: ChatClient, graph: Neo4j_DB, prompt_path: str = LINKER_PROMPT_PATH, retrieval_prompt_ex_path: str = RETRIEVAL_PROMPT_EXTENSION):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.client = client
-        self.fuzzy_skb = Fuzzy_SKB()
-        self.fuzzy_skb.load_pickle()
+        self.graph = graph
+
+        self.linker_list_prev = None
 
         with open(prompt_path) as f:
             self.prompt = f.read()
+
+        with open(retrieval_prompt_ex_path) as f:
+            self.retrieval_prompt_extension = f.read()
 
     def extract(self, question: str):
         prompt = self.prompt.format(
@@ -29,32 +34,20 @@ class EntityLinker:
 
         return json.loads(response)
 
-    # def n_gram_splitter(self, phrase: str):
-    #     spans = []
-    #     split_phrase = phrase.split()
-    #     for i in range(len(split_phrase)):
-    #         for j in range(1, len(split_phrase) - i + 1):
-    #             spans.append(" ".join(split_phrase[i:i+j]))
-    #     return spans
-
     def fuzzy_search(self, phrases: list[str]):
         if not phrases:
             return []
 
-        matches = []
+        matches = ""
         for phrase in phrases:
-            matches += self.fuzzy_skb.query(phrase, return_scores=False)
+            matches += f"For '{phrase}':\n" + "\n".join(str(m) for m in self.graph.neo4j.ftsearch(phrase)) + "\n\n"
 
         return matches
 
     def get_linked_context(self, question: str):
         extraction = self.extract(question)
+        extraction = [e.replace("(", "").replace(")", "") for e in extraction]
         matches = self.fuzzy_search(extraction)
 
-        prompt = f"""\n### Entity candidates
-
-Here are some already fuzzy matched entities from the knowledge base, from some mentions in the question. Pick which ones to use, as they are not always relevant. There may be a single match that is best.
-
-{"\n".join(str(m) for m in matches)}"""
-
-        return prompt
+        self.linker_list_prev = matches
+        return f"\n{self.retrieval_prompt_extension}\n\n{matches}"

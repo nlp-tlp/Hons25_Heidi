@@ -1,20 +1,32 @@
 import streamlit as st
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="\n=== %(levelname)s [%(name)s] ===\n%(message)s\n"
+)
 
 pg = st.navigation({
     "Chats": [
-        st.Page("chat_pages/chat_text2cypher_extended.py", title="Chat Text2Cypher (extended)"),
-        st.Page("chat_pages/chat_text2cypher.py", title="Chat Text2Cypher"),
-        st.Page("chat_pages/chat_text2cypher_nolink.py", title="Chat Text2Cypher (no-linking)"),
-        st.Page("chat_pages/chat_neighbourvector.py", title="Chat NeighbourVector"),
-        st.Page("chat_pages/chat_cyphervector_linear.py", title="Chat CypherVector (linear)")
+        st.Page("chat_pages/chat_vanilla_text2cypher.py", title="Vanilla Text-to-Cypher"),
+        st.Page("chat_pages/chat_property_descriptive.py", title="Property Descriptive"),
+        st.Page("chat_pages/chat_property_text.py", title="Property Text"),
+        st.Page("chat_pages/chat_concept_descriptive.py", title="Concept Descriptive"),
+        st.Page("chat_pages/chat_concept_text.py", title="Concept Text"),
+        st.Page("chat_pages/chat_row_descriptive.py", title="Row Descriptive"),
+        st.Page("chat_pages/chat_row_text.py", title="Row Text"),
+        st.Page("chat_pages/chat_vanilla_vectorsearch.py", title="Vanilla Vector-Search")
     ],
     "Embeddings": [
-        st.Page("embedding_pages/embeddings_te3s.py", title="Embedding Te3s"),
-        st.Page("embedding_pages/embeddings_glove.py", title="Embedding Glove (mean-pooling)"),
-        st.Page("embedding_pages/embeddings_flair.py", title="Embedding Flair (mean-pooling)")
+        st.Page("embedding_pages/embedding_property_text.py", title="Property Text"),
+        st.Page("embedding_pages/embedding_concept_text.py", title="Concept Text"),
+        st.Page("embedding_pages/embedding_row_text.py", title="Row Text"),
+        st.Page("embedding_pages/embedding_row_all.py", title="Row All"),
     ],
     "Executions": [
-        st.Page("execution_pages/execution_cypher_extended.py", title="Execution Cypher (extended)")
+        st.Page("execution_pages/execution_property_text.py", title="Property Text"),
+        st.Page("execution_pages/execution_concept_text.py", title="Concept Text"),
+        st.Page("execution_pages/execution_row_text.py", title="Row Text"),
     ]
 })
 

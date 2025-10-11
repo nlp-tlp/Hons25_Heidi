@@ -5,7 +5,7 @@ import json
 
 class SKBSchema:
     @classmethod
-    def schema_to_jsonlike(cls):
+    def schema_to_jsonlike(cls, tag_semantic: bool = True, tag_uniqueness: bool = True):
         schema_dict = {}
         for name, cls in vars(cls).items():
             if not (isinstance(cls, type) and issubclass(cls, SKBNode)):
@@ -19,11 +19,13 @@ class SKBSchema:
                 if field.json_schema_extra.get("relation"):
                     field_name = field_name.upper()
                     meta.pop()
-                    meta.append(f"relation_to {field.json_schema_extra.get('dest')}")
-                if field.json_schema_extra.get("id"):
+                    meta.append(f"@relation_to({field.json_schema_extra.get('dest')})")
+                if tag_uniqueness and "id" in field.json_schema_extra:
                     meta.append("@informs_uniqueness")
-                if field.json_schema_extra.get("semantic"):
+                if tag_semantic and "semantic" in field.json_schema_extra:
                     meta.append("@match_semantically")
+                if "concats_fields" in field.json_schema_extra:
+                    meta.append(f"@concats_fields({field.json_schema_extra['concats_fields']})")
 
                 entity_dict[field_name] = ' '.join(meta)
 
@@ -32,8 +34,8 @@ class SKBSchema:
         return schema_dict
 
     @classmethod
-    def schema_to_jsonlike_str(cls):
-        return json.dumps(cls.schema_to_jsonlike(), indent=4).replace('"', '')
+    def schema_to_jsonlike_str(cls, tag_uniqueness: bool = True, tag_semantic: bool = True):
+        return json.dumps(cls.schema_to_jsonlike(tag_uniqueness, tag_semantic), indent=4).replace('"', '')
 
 class SKBNode(BaseModel):
     def get_props(self) -> dict[str, any]:
@@ -93,3 +95,27 @@ class SKB:
     def load_pickle(self, path: str):
         with open(path, "rb") as f:
             self.nodes = pickle.load(f)
+
+class SKBGraph:
+    def load_skb(self, skb_file: str):
+        self.skb = SKB(self.schema)
+        self.skb.load_pickle(skb_file)
+
+    def setup_chroma(self):
+        from databases import Chroma_DB
+        self.chroma = Chroma_DB(collection_name=self.name, embed_fnc=self.embedding_func)
+        self.chroma.parse(self.skb)
+
+    def load_chroma(self):
+        from databases import Chroma_DB
+        self.chroma = Chroma_DB(collection_name=self.name, embed_fnc=self.embedding_func)
+
+    def setup_neo4j(self):
+        from databases import Neo4j_DB
+        self.neo4j = Neo4j_DB(collection_name=self.name.replace("_", "-"))
+        self.neo4j.parse(self.skb)
+        self.neo4j.attach_chroma_embeddings(self.chroma)
+
+    def load_neo4j(self):
+        from databases import Neo4j_DB
+        self.neo4j = Neo4j_DB(collection_name=self.name.replace("_", "-"))
