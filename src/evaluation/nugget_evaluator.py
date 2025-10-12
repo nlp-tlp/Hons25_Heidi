@@ -84,7 +84,7 @@ class QASet:
 
             # Process response
             response_json = json.loads(response)
-            entry["Model_Nuggets"] = json.dumps(response_json["nuggets"], ensure_ascii=False)
+            entry["Nuggets"] = json.dumps(response_json["nuggets"], ensure_ascii=False)
             extracted.append(entry)
 
         df_new = pd.DataFrame(extracted)
@@ -110,7 +110,7 @@ class QASet:
 
             prompt = self.nugget_matching_prompt.format(
                 question=question,
-                model_nuggets=model_entry["Model_Nuggets"],
+                model_nuggets=model_entry["Nuggets"],
                 generated_answer=candidate_answer
             )
             self.logger.info(f"Prompting LLM using: {prompt}")

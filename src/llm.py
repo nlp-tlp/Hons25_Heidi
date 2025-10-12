@@ -11,7 +11,7 @@ class ChatClient:
     @param temperature: The randomness of the model. Between 0.0 and 1.0.
     """
 
-    def __init__(self, provider: str = "ollama", model: str = "llama3.2"):
+    def __init__(self, provider: str = "openai", model: str = "gpt-4.1"):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.provider = provider
         self.model = model
@@ -67,7 +67,7 @@ class EmbeddingClient:
     @param dimensions: Number of dimensions for the produced vectors. Used if the model specified supports this setting.
     """
 
-    def __init__(self, provider: str = "ollama", model: str = "mxbai-embed-large", dimensions: float | None = None):
+    def __init__(self, provider: str = "openai", model: str = "text-embedding-3-small", dimensions: float | None = None):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.provider = provider
         self.model = model
