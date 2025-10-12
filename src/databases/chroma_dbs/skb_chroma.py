@@ -7,8 +7,6 @@ import re
 from chromadb import Collection, QueryResult, Documents, PersistentClient
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction, EmbeddingFunction
 import sqlite3
-from flair.embeddings import WordEmbeddings, StackedEmbeddings, FlairEmbeddings, DocumentPoolEmbeddings
-from flair.data import Sentence
 
 from ..pkl.skb import SKB
 
@@ -139,41 +137,3 @@ class Te3sEmbeddingFunction(OpenAIEmbeddingFunction):
             api_key=OPENAI_API_KEY,
             model_name="text-embedding-3-small"
         )
-
-class GloveEmbeddingFunction(EmbeddingFunction[Documents]):
-    def __init__(self):
-        glove_embedding = WordEmbeddings("glove")
-        self.model = DocumentPoolEmbeddings([glove_embedding], pooling="mean")
-
-    def __call__(self, input: Documents) -> list[list[float]]:
-        if not input:
-            return []
-
-        embeddings = []
-        for doc in input:
-            sentence = Sentence(doc)
-            self.model.embed(sentence)
-            embedding = sentence.embedding.detach().numpy()
-            embeddings.append(embedding)
-        return embeddings
-
-class FlairEmbeddingFunction(EmbeddingFunction[Documents]):
-    def __init__(self):
-        stacked_flair_embedding = StackedEmbeddings([
-            WordEmbeddings("glove"),
-            FlairEmbeddings("news-forward"),
-            FlairEmbeddings("news-backward")
-        ])
-        self.model = DocumentPoolEmbeddings([stacked_flair_embedding], pooling="mean")
-
-    def __call__(self, input: Documents) -> list[list[float]]:
-        if not input:
-            return []
-
-        embeddings = []
-        for doc in input:
-            sentence = Sentence(doc)
-            self.model.embed(sentence)
-            embedding = sentence.embedding.detach().numpy()
-            embeddings.append(embedding)
-        return embeddings
