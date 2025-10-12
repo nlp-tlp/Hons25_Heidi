@@ -30,7 +30,7 @@ if __name__ == "__main__":
     match action:
         case "skb":
             scope_graph.setup_skb(
-                filepath="databases/pkl/fmea_barrick_filled.csv",
+                filepath="databases/pkl/fmea_dataset_filled.csv",
                 outpath=f"databases/pkl/{scope}.pkl"
             )
         case "chroma":

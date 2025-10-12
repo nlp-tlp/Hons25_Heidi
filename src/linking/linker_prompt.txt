@@ -9,7 +9,7 @@ Given a question, extract all candidate phrases that could correspond to entitie
 
 Ignore any names that is simply referring to an entity or property type. Do not add these into your final list:
 - Existing entities: Subsystem, Component, SubComponent, FailureMode, FailureEffect, FailureCause, RecommendedAction, CurrentControls.
-- Existing properties: Spreadsheet, Name, Description, Occurrence, Detection, RPN, Severity.
+- Existing properties: Name, Description, Occurrence, Detection, RPN, Severity.
 
 Entities may consist of one or more words. Do not try to guess their specific type, just extract the most complete and meaningful phrases that could be matched to a knowledge base entry.
 
