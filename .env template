@@ -1,0 +1,11 @@
+# Neo4j
+NEO4J_URI = "bolt://localhost:7687" # default for neo4j, change as necessary
+NEO4J_USER = "user" # (REPLACE) needs admin for loading new data, reader for just rag querying
+NEO4J_PASS = "pass" # (REPLACE) needs admin for loading new data, reader for just rag querying
+DEBUG=@neo4j/graphql:* node src/index.js # default for neo4j, change as necessary
+
+# Models
+OPENAI_API_KEY = "..." # (REPLACE)
+
+# Vector
+CHROMA_PATH = ".../Hons25_Heidi/src/databases/chroma_dbs/chroma" # (REPLACE)
