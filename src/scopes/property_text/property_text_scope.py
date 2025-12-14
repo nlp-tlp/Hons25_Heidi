@@ -107,25 +107,23 @@ class PropertyTextScopeGraph(SKBGraph):
         self.skb.save_pickle(outpath)
 
 class PropertyTextScopeRetriever:
-    def __init__(self,  graph: PropertyTextScopeGraph, prompt_path: str,
-        allow_linking: bool, allow_extended: bool, allow_descriptive_only: bool,
-        chat_client: ChatClient, embedding_client: EmbeddingClient = None,
-    ):
+    def __init__(self, prompt_path: str, allow_linking: bool, allow_extended: bool, allow_descriptive_only: bool):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.allow_linking = allow_linking # these options are only meaningful for this strat
         self.allow_extended = allow_extended
         self.allow_descriptive_only = allow_descriptive_only
 
-        self.graph = graph
-        self.chat_client = chat_client
-        self.embedding_client = embedding_client
-        self.linker = EntityLinker(client=ChatClient(provider="openai", model="gpt-4.1-mini-2025-04-14"), graph=self.graph)
+        self.graph = PropertyTextScopeGraph()
+        self.graph.load_neo4j()
+        self.chat_client = ChatClient()
+        self.embedding_client = EmbeddingClient()
+        self.linker = EntityLinker(graph=self.graph)
 
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def retrieve(self, question: str):
+    def retrieve(self, question: str, model: str = None):
         self.logger.info(f"Question given: {question}")
 
         # Entity linking
@@ -134,7 +132,7 @@ class PropertyTextScopeRetriever:
             linker_context = self.linker.get_linked_context(question)
 
         # Get LLM-generated Cypher
-        query = self.generate_cypher(question, linker_context=linker_context)
+        query = self.generate_cypher(question, linker_context=linker_context, model=model)
         self.logger.info(f"Generated Cypher: {query}")
 
         # Process extended functions and run command
@@ -144,7 +142,7 @@ class PropertyTextScopeRetriever:
         tag_semantic = True if self.allow_descriptive_only else False
         return self.graph.schema.schema_to_jsonlike_str(tag_semantic=tag_semantic, tag_uniqueness=True)
 
-    def generate_cypher(self, question: str, linker_context: str = ""):
+    def generate_cypher(self, question: str, linker_context: str = "", model: str = None):
         # Build prompt
         prompt = self.prompt.format(
             schema=self.schema_context(),
@@ -153,7 +151,7 @@ class PropertyTextScopeRetriever:
         self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate Cypher from LLM
-        raw_response = self.chat_client.chat(prompt=prompt)
+        raw_response = self.chat_client.chat(prompt=prompt, model=model)
         cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
 

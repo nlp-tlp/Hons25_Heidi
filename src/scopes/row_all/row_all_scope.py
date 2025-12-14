@@ -41,14 +41,13 @@ class RowAllScopeGraph(SKBGraph):
         self.skb.save_pickle(outpath)
 
 class RowAllScopeRetriever:
-    def __init__(self, graph: RowAllScopeGraph,
-        chat_client: ChatClient, embedding_client: EmbeddingClient
-    ):
+    def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.graph = graph
-        self.chat_client = chat_client
-        self.embedding_client = embedding_client
+        self.graph = RowAllScopeGraph()
+        self.graph.load_chroma()
+        self.chat_client = ChatClient()
+        self.embedding_client = EmbeddingClient()
 
     def retrieve(self, question: str, k=25, threshold=None):
         self.logger.info(f"Question given: {question}")

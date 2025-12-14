@@ -50,26 +50,24 @@ class RowTextScopeGraph(SKBGraph):
         self.skb.save_pickle(outpath)
 
 class RowTextScopeRetriever:
-    def __init__(self, graph: RowTextScopeGraph, prompt_path: str,
-        allow_descriptive_only: bool,
-        chat_client: ChatClient, embedding_client: EmbeddingClient
-    ):
+    def __init__(self, prompt_path: str, allow_descriptive_only: bool):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.allow_descriptive_only = allow_descriptive_only
 
-        self.graph = graph
-        self.chat_client = chat_client
-        self.embedding_client = embedding_client
+        self.graph = RowTextScopeGraph()
+        self.graph.load_neo4j()
+        self.chat_client = ChatClient()
+        self.embedding_client = EmbeddingClient()
 
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def retrieve(self, question: str):
+    def retrieve(self, question: str, model: str = None):
         self.logger.info(f"Question given: {question}")
 
         # Get LLM-generated Cypher
-        query = self.generate_cypher(question)
+        query = self.generate_cypher(question, model=model)
         self.logger.info(f"Generated Cypher: {query}")
 
         # Process extended functions and run command
@@ -79,7 +77,7 @@ class RowTextScopeRetriever:
         tag_semantic = True if self.allow_descriptive_only else False
         return self.graph.schema.schema_to_jsonlike_str(tag_semantic=tag_semantic, tag_uniqueness=True)
 
-    def generate_cypher(self, question: str):
+    def generate_cypher(self, question: str, model: str = None):
         # Build prompt
         prompt = self.prompt.format(
             schema=self.schema_context(),
@@ -88,7 +86,7 @@ class RowTextScopeRetriever:
         self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate Cypher from LLM
-        raw_response = self.chat_client.chat(prompt=prompt)
+        raw_response = self.chat_client.chat(prompt=prompt, model=model)
         cypher_query = re.sub(r"^```[a-zA-Z]*\s*|```$", "", raw_response, flags=re.MULTILINE).strip() # Remove markdown if present
         return cypher_query
 

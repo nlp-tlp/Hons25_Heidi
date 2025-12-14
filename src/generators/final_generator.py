@@ -1,28 +1,28 @@
 import logging
 import tiktoken
 
-from llm import ChatClient
+from llm import ChatClient, chat_model_choices
 
 # Prompts
 PROMPT_PATH = "generators/generator_prompt.txt"
 
 # Generator
 class FinalGenerator:
-    def __init__(self, client: ChatClient, prompt_path: str = PROMPT_PATH):
+    def __init__(self, prompt_path: str = PROMPT_PATH):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.client = client
+        self.client = ChatClient()
 
         with open(prompt_path) as f:
             self.prompt = f.read()
 
-    def generate(self, question: str, retrieved_nodes: list[dict], schema_context: str, cypher_query: str = None, linker_list: str = None):
+    def generate(self, question: str, retrieved_nodes: list[dict], schema_context: str, model: str = chat_model_choices[0], cypher_query: str = None, linker_list: str = None):
         # Cases to use prewritten answers
         if len(retrieved_nodes) == 0:
             self.logger.info("No nodes retrieved, returning pre-written response.")
             return "No records could be found. Either the answer is that there are no such entities, or that the context given was insufficient to retrieve the right records. If you believe it is the latter, try rephrasing your question."
 
         context_string = "\n".join([str(r) for r in retrieved_nodes]) if retrieved_nodes else "No relevant records found."
-        enc = tiktoken.get_encoding("o200k_base") # tokeniser for gpt-4.1
+        enc = tiktoken.get_encoding("o200k_base")
         num_tokens = len(enc.encode(context_string))
         if num_tokens > 5000:
             self.logger.info(f"Too much information retrieved: {len(retrieved_nodes)} nodes with {num_tokens} tokens, returning pre-written response.")
@@ -42,5 +42,5 @@ class FinalGenerator:
         self.logger.info(f"Prompting LLM using: {prompt}")
 
         # Generate final response from LLM
-        final_response = self.client.chat(prompt=prompt)
+        final_response = self.client.chat(prompt=prompt, model=model)
         return final_response
