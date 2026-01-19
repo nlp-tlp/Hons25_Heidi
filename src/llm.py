@@ -17,6 +17,8 @@ class ChatClient:
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def chat(self, prompt: str, model: str = chat_model_choices[0], response_format: BaseModel | RootModel = None) -> str:
+        if model is None:
+            model = chat_model_choices[0]
         self.logger.info(f"Prompting Chat LLM at OpenAI model {model}")
 
         response = self.client.beta.chat.completions.parse(

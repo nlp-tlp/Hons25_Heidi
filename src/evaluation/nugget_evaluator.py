@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from llm import ChatClient
 from generators import FinalGenerator
 
-QA_PATH = "evaluation/model_answers.xlsx"
+QA_PATH = "evaluation/fmea_qa_model.xlsx"
 NUGGET_EXTRACTION_PROMPT = "evaluation/nugget_extraction_prompt.txt"
 NUGGET_MATCHING_PROMPT = "evaluation/nugget_matching_prompt.txt"
 
@@ -52,7 +52,7 @@ class QASet:
             if error:
                 rag_run.append({"ID": question_id, "Question": question, "Model_Answer": entry["Answer"], "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
                 continue
-            final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model)
+            final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query)
 
             retrieved_records_str = "\n".join([str(r) for r in retrieved_records])
             retrieved_records_length = self.metric_tok_length(retrieved_records_str)
@@ -84,7 +84,7 @@ class QASet:
 
             # Process response
             response_json = json.loads(response)
-            entry["Nuggets"] = json.dumps(response_json["nuggets"], ensure_ascii=False)
+            entry["Model_Nuggets"] = json.dumps(response_json["Model_Nuggets"], ensure_ascii=False)
             extracted.append(entry)
 
         df_new = pd.DataFrame(extracted)
@@ -110,7 +110,7 @@ class QASet:
 
             prompt = self.nugget_matching_prompt.format(
                 question=question,
-                model_nuggets=model_entry["Nuggets"],
+                model_nuggets=model_entry["Model_Nuggets"],
                 generated_answer=candidate_answer
             )
             self.logger.info(f"Prompting LLM using: {prompt}")
