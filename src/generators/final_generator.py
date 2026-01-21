@@ -24,6 +24,7 @@ class FinalGenerator:
         context_string = "\n".join([str(r) for r in retrieved_nodes]) if retrieved_nodes else "No relevant records found."
         enc = tiktoken.get_encoding("o200k_base")
         num_tokens = len(enc.encode(context_string))
+        self.logger.info(f"Num tokens: {num_tokens}")
         if num_tokens > 5000:
             self.logger.info(f"Too much information retrieved: {len(retrieved_nodes)} nodes with {num_tokens} tokens, returning pre-written response.")
             return "Too many records were retrieved. Either the answer contains that many entities, or the model gave a bad plan of retrieval. If you believe it is the latter, try entering the question again."

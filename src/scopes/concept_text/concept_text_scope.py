@@ -243,6 +243,20 @@ class ConceptTextScopeRetriever:
                 )
                 query = "\n".join(fuzzy_subqueries) + "\n" + query
 
+            # Add fuzzy variables to existing WITHs to avoid going out of scope
+            fuzzy_list_vars = [v[1] for v in fuzzy_var_names]
+            if fuzzy_list_vars:
+                def with_replacer(match):
+                    matched_with = match.group(0)
+                    if re.match(r"WITH\s+\*", matched_with, re.IGNORECASE):
+                        return matched_with
+
+                    fuzzy_with = ", ".join(fuzzy_list_vars)
+                    rest_with = matched_with[len("WITH"):].lstrip()
+                    return f"WITH {fuzzy_with}, {rest_with}"
+
+                query = re.sub(r"\bWITH\b[^\n]*", with_replacer, query, flags=re.IGNORECASE)
+
         query = self.unescape_parens_in_strings(query)
         self.logger.info(f"Converted query to: {query}")
         return query, params
