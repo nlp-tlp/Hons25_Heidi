@@ -106,141 +106,87 @@ class RowTextScopeRetriever:
     def convert_extended_functions(self, query: str, semantic_threshold: float = 0.6586, fuzzy_threshold: float = 0.42):
         query = self.escape_parens_in_strings(query)
 
-        # Fuzzy match replacement
-        fuzzy_matches = []
-        if self.allow_descriptive_only:
-            fuzzy_matches = list(re.finditer(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", query))
-            fuzzy_subqueries = []
-            fuzzy_var_names = []
-            for i, match in enumerate(fuzzy_matches, 1):
-                target = match.group(1).strip()
-                target_entity = target.split('.')[0]
-                search_phrase = match.group(2)[1:-1].replace("__LPAREN__", "").replace("__RPAREN__", "")
-
-                split_text = [f"{s}~" for s in search_phrase.split()]
-                fuzzy_list_var = f"fuzzy_list_{i}"
-                fuzzy_score_var = f"fuzzy_score_{i}"
-
-                # Subquery to collect matching nodes
-                subquery = (
-                    f"\nCALL () {{\n"
-                    f"  CALL db.index.fulltext.queryNodes('names', '{' OR '.join(split_text)}')\n"
-                    f"  YIELD node AS node_{i}, score AS {fuzzy_score_var}\n"
-                    f"  WHERE {fuzzy_score_var} > {fuzzy_threshold}\n"
-                    f"  RETURN collect(node_{i}) AS {fuzzy_list_var}\n"
-                    f"}}"
-                )
-                fuzzy_subqueries.append(subquery)
-                fuzzy_var_names.append((target_entity, fuzzy_list_var))
-
-            def fuzzy_in_replacer(match):
-                target, fuzzy_list_var = fuzzy_var_names.pop(0)
-                return f"{target} IN {fuzzy_list_var}"
-
         # Semantic match replacement
-        where_matches = list(re.finditer(
-            r"(WHERE\s+)(.*?)(?=\s+(RETURN|WITH|ORDER BY|SKIP|LIMIT|MATCH|UNWIND|CALL|CREATE|MERGE|SET|DELETE|REMOVE|FOREACH|LOAD CSV|OPTIONAL MATCH|$))",
-            query,
-            re.IGNORECASE | re.DOTALL
-        ))
+        where_matches = list(re.finditer(r"(WHERE\s+)(.*?)(?=\s+(CALL|CREATE|DELETE|DETACH|EXISTS|FOREACH|LOAD|MATCH|MERGE|OPTIONAL|REMOVE|RETURN|SET|START|UNION|UNWIND|WITH|LIMIT|ORDER|SKIP|WHERE|YIELD|$))", query, re.IGNORECASE | re.DOTALL))
         if not where_matches:
             query = self.unescape_parens_in_strings(query)
             self.logger.info(f"Converted query to: {query}")
             return query, None
 
-        i = 1
         params = {}
         for where_match in where_matches:
             semantic_matches = re.findall(r"IS_SEMANTIC_MATCH\(([^,]+),\s*([^)]+)\)", where_match.group(0))
+            if not semantic_matches:
+                continue
 
-            with_clause = "WITH *"
+            new_with_clause = "WITH *"
             new_where_clause = where_match.group(0)
-            for target, search_phrase in semantic_matches:
-                search_phrase_clean = search_phrase[1:-1] # take off apostrophes
-                self.logger.info(f"Processing semantic match for: {search_phrase_clean}")
-                vector = self.embedding_client.embed(search_phrase_clean.strip().lower())
+            for semantic_match_num, (target, search_phrase) in enumerate(semantic_matches):
+                self.logger.info(f"Processing embedding for: {search_phrase[1:-1].strip().lower()}")
+                vector = self.embedding_client.embed(search_phrase[1:-1].strip().lower()) # take off apostrophes and normalise
+                vector_placeholder = f"vector_{semantic_match_num}"
+                similarity_var = f"similarity_{semantic_match_num}"
 
-                vector_placeholder = f"vector_{i}"
-                similarity_var = f"similarity_{i}"
-                target_entity = target.split('.')[0]
-                i += 1
-
-                with_clause += f", vector.similarity.cosine({target_entity}.embedding, ${vector_placeholder}) AS {similarity_var}"
+                new_with_clause += f", vector.similarity.cosine({target.split('.')[0]}.embedding, ${vector_placeholder}) AS {similarity_var}"
                 new_where_clause = re.sub(rf"IS_SEMANTIC_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{similarity_var} > {semantic_threshold}", new_where_clause)
                 params[vector_placeholder] = vector
+            query = query.replace(where_match.group(), f"{new_with_clause}\n{new_where_clause}")
 
-            if semantic_matches:
-                query = query.replace(where_match.group(0), f"{with_clause} {new_where_clause}")
+        # Fuzzy match replacement
+        if not self.allow_descriptive_only:
+            query = self.unescape_parens_in_strings(query)
+            self.logger.info(f"Converted query to: {query}")
+            return query, params
 
-        # Needs to be here to avoid triggering the semantic matching regex
-        if fuzzy_matches:
-            # Split query on UNION (preserving UNIONs)
-            union_parts = re.split(r'(\s+UNION\s+)', query, flags=re.IGNORECASE)
-            if len(union_parts) > 1:
-                rebuilt_query = ""
-                fuzzy_pattern = r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)"
+        rebuilt_query = ""
+        union_branches = re.split(r'\s+UNION\s+', query, flags=re.IGNORECASE)
+        for branch in union_branches:
+            fuzzy_matches = re.findall(r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)", branch)
+            if not fuzzy_matches:
+                continue
 
-                fuzzy_var_names_copy = fuzzy_var_names.copy()  # To avoid mutation issues
+            new_branch = branch
+            fuzzy_subqueries = []
+            fuzzy_list_vars = []
+            for fuzzy_match_num, (target, search_phrase) in enumerate(fuzzy_matches):
+                split_text = [f"{s}~" for s in search_phrase[1:-1].replace("__LPAREN__", "").replace("__RPAREN__", "").replace("-", " ").split()]
+                fuzzy_list_var = f"fuzzy_list_{fuzzy_match_num}"
+                fuzzy_score_var = f"fuzzy_score_{fuzzy_match_num}"
 
-                for idx in range(0, len(union_parts), 2):
-                    branch = union_parts[idx]
-                    union = union_parts[idx+1] if idx+1 < len(union_parts) else ""
-
-                    branch_fuzzy_matches = list(re.finditer(fuzzy_pattern, branch))
-                    branch_fuzzy_subqueries = []
-                    branch_fuzzy_var_names = []
-
-                    for i, match in enumerate(branch_fuzzy_matches, 1):
-                        target_entity, fuzzy_list_var = fuzzy_var_names_copy.pop(0)
-                        branch_fuzzy_var_names.append((target_entity, fuzzy_list_var))
-                        branch_fuzzy_subqueries.append(fuzzy_subqueries.pop(0))
-
-                    def branch_fuzzy_in_replacer(match):
-                        target, fuzzy_list_var = branch_fuzzy_var_names.pop(0)
-                        return f"{target} IN {fuzzy_list_var}"
-
-                    # Replace fuzzy matches in branch
-                    if branch_fuzzy_matches:
-                        branch = re.sub(fuzzy_pattern, branch_fuzzy_in_replacer, branch)
-                        branch = "\n".join(branch_fuzzy_subqueries) + branch
-
-                    rebuilt_query += branch + union
-                query = rebuilt_query
-            else:
-                query = re.sub(
-                    r"IS_FUZZY_MATCH\(([^,]+),\s*([^)]+)\)",
-                    fuzzy_in_replacer,
-                    query
+                subquery = (
+                    f"\nCALL () {{\n"
+                    f"  CALL db.index.fulltext.queryNodes('names', '{' OR '.join(split_text)}')\n"
+                    f"  YIELD node AS node_{fuzzy_match_num}, score AS {fuzzy_score_var}\n"
+                    f"  WHERE {fuzzy_score_var} > {fuzzy_threshold}\n"
+                    f"  RETURN collect(node_{fuzzy_match_num}) AS {fuzzy_list_var}\n"
+                    f"}}\n"
                 )
-                query = "\n".join(fuzzy_subqueries) + "\n" + query
+                fuzzy_subqueries.append(subquery)
+                new_branch = re.sub(rf"IS_FUZZY_MATCH\(\s*{target}\s*,\s*{search_phrase}\s*\)", f"{target.split('.')[0]} IN {fuzzy_list_var}", new_branch)
+                fuzzy_list_vars.append(fuzzy_list_var)
 
-            # Add fuzzy variables to existing WITHs to avoid going out of scope
-            fuzzy_list_vars = [v[1] for v in fuzzy_var_names]
-            if fuzzy_list_vars:
-                def with_replacer(match):
-                    matched_with = match.group(0)
-                    if re.match(r"WITH\s+\*", matched_with, re.IGNORECASE):
-                        return matched_with
+            with_matches = list(re.finditer(r"(WITH\s+)(.*?)(?=\s+(CALL|CREATE|DELETE|DETACH|EXISTS|FOREACH|LOAD|MATCH|MERGE|OPTIONAL|REMOVE|RETURN|SET|START|UNION|UNWIND|WITH|LIMIT|ORDER|SKIP|WHERE|YIELD|$))", new_branch, re.IGNORECASE | re.DOTALL))
+            for with_match in with_matches:
+                if "*" not in with_match.group():
+                    new_branch = new_branch.replace(with_match.group(), f"{with_match.group()}, {", ".join(fuzzy_list_vars)}")
 
-                    fuzzy_with = ", ".join(fuzzy_list_vars)
-                    rest_with = matched_with[len("WITH"):].lstrip()
-                    return f"WITH {fuzzy_with}, {rest_with}"
+            if rebuilt_query:
+                rebuilt_query += "\nUNION\n"
+            rebuilt_query += "\n".join(fuzzy_subqueries) + new_branch
 
-                query = re.sub(r"\bWITH\b[^\n]*", with_replacer, query, flags=re.IGNORECASE)
-
+        if rebuilt_query:
+            query = rebuilt_query
         query = self.unescape_parens_in_strings(query)
         self.logger.info(f"Converted query to: {query}")
         return query, params
 
     def escape_parens_in_strings(self, text: str):
-        string_pattern = re.compile(r"(['\"])(.*?)(\1)", re.DOTALL)
-
         def replacer(match):
-            quote, content, end = match.groups()
-            escaped_content = content.replace("(", "__LPAREN__").replace(")", "__RPAREN__")
-            return f"{quote}{escaped_content}{end}"
+            quote_start, quoted_content, quote_end = match.groups()
+            escaped_content = quoted_content.replace("(", "__LPAREN__").replace(")", "__RPAREN__")
+            return f"{quote_start}{escaped_content}{quote_end}"
 
-        return string_pattern.sub(replacer, text)
+        return re.sub(r"(['\"])(.*?)(\1)", replacer, text, re.DOTALL)
 
     def unescape_parens_in_strings(self, text: str):
         return text.replace("__LPAREN__", "(").replace("__RPAREN__", ")")
