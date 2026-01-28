@@ -36,9 +36,9 @@ class FinalGenerator:
             schema=schema_context
         )
         if cypher_query:
-            prompt += f"\n### Retrieval query\n\nBelow is the query that was used by your retrieval counterpart, which was instructed to give you enough context to answer the provided question:\n\n{cypher_query}\n"
+            prompt += f"\n### Retrieval query\n\nBelow is the query that was used by your retriever counterpart, which was instructed to give you enough context to answer the provided question. Do not assume the retriever was correct in its choices, and only use this query to interpret the returned records. Remain selective with the records chosen to present to the user:\n\n{cypher_query}\n"
         if linker_list:
-            prompt += f"\n### Entity linking\n\nThis RAG strategy also involved using entity linking. This fuzzy matched list of entities was provided to the retriever before they generated the cypher query. They were instructed to pick critically.\n\nThe user asking the question may be mistaken about the right type, in which case it would be helpful to retrieve for another type that contains a very similar name. The user may also link together names that should be split across multiple entity types, in which case they were asked to check combinations of entities that make up the right names:\n\n{linker_list}"
+            prompt += f"\n### Entity linking\n\nThis RAG strategy also involved using entity linking. This fuzzy matched list of entities was provided to the retriever before they generated the cypher query. They were instructed to pick critically.\n\nThe user asking the question may be mistaken about the right type, in which case the retriever was instructed to retrieve for other reasonable types if they contained very similar names. The user may also link together names that should be split across multiple entity types, in which case the retriever was asked to check combinations of entities that make up the right names:\n\n{linker_list}"
 
         self.logger.info(f"Prompting LLM using: {prompt}")
 

@@ -52,7 +52,12 @@ class QASet:
             if error:
                 rag_run.append({"ID": question_id, "Question": question, "Model_Answer": entry["Answer"], "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
                 continue
-            final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query)
+
+            if retriever.allow_linking:
+                linker_list = retriever.linker.linker_list_prev
+                final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query, linker_list=linker_list)
+            else:
+                final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query)
 
             retrieved_records_str = "\n".join([str(r) for r in retrieved_records])
             retrieved_records_length = self.metric_tok_length(retrieved_records_str)

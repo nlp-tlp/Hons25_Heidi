@@ -24,7 +24,11 @@ class ChatClient:
         response = self.client.beta.chat.completions.parse(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.001,
+            temperature=0,
+            top_p=0.0001, # shouldn't matter, just in case it does
+            seed=12345, # shouldn't matter
+            presence_penalty = 0.0, # default
+            frequency_penalty = 0.0, # default
             **({"response_format": response_format} if response_format is not None else {})
         )
         return response.choices[0].message.content.strip()

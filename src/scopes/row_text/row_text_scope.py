@@ -52,6 +52,7 @@ class RowTextScopeRetriever:
     def __init__(self, prompt_path: str, allow_descriptive_only: bool):
         self.logger = logging.getLogger(self.__class__.__name__)
 
+        self.allow_linking = False
         self.allow_descriptive_only = allow_descriptive_only
 
         self.graph = RowTextScopeGraph()

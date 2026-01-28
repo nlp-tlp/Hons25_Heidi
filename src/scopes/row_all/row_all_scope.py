@@ -44,6 +44,8 @@ class RowAllScopeRetriever:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
+        self.allow_linking = False
+
         self.graph = RowAllScopeGraph()
         self.graph.load_chroma()
         self.chat_client = ChatClient()
