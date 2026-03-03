@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from llm import ChatClient
 from generators import FinalGenerator
 
-QA_PATH = "evaluation/model_answers.xlsx"
+QA_PATH = "evaluation/fmea_qa_model.xlsx"
 NUGGET_EXTRACTION_PROMPT = "evaluation/nugget_extraction_prompt.txt"
 NUGGET_MATCHING_PROMPT = "evaluation/nugget_matching_prompt.txt"
 
@@ -32,15 +32,15 @@ class QASet:
     def __init__(self, nugget_extraction_prompt_path=NUGGET_EXTRACTION_PROMPT, nugget_matching_prompt=NUGGET_MATCHING_PROMPT):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.chat_client = ChatClient(provider="openai", model="gpt-4.1-2025-04-14")
-        self.generator = FinalGenerator(client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"))
+        self.chat_client = ChatClient()
+        self.generator = FinalGenerator()
 
         with open(nugget_extraction_prompt_path, 'r') as f:
             self.nugget_extraction_prompt = f.read()
         with open(nugget_matching_prompt, 'r') as f:
             self.nugget_matching_prompt = f.read()
 
-    def run_rag(self, retriever, run_file_path: str, model_answers_path=QA_PATH):
+    def run_rag(self, retriever, run_file_path: str, model: str = None, model_answers_path=QA_PATH):
         df_model = pd.read_excel(model_answers_path).to_dict(orient="records")
 
         rag_run = []
@@ -48,11 +48,16 @@ class QASet:
             question_id = entry["ID"]
             question = entry["Question"]
 
-            cypher_query, retrieved_records, error = retriever.retrieve(question)
+            cypher_query, retrieved_records, error = retriever.retrieve(question, model=model)
             if error:
                 rag_run.append({"ID": question_id, "Question": question, "Model_Answer": entry["Answer"], "Query": cypher_query, "Final_Response": f"EXECUTION ERROR: {error}", "Retrieved_Tok_Length": 0})
                 continue
-            final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context())
+
+            if retriever.allow_linking:
+                linker_list = retriever.linker.linker_list_prev
+                final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query, linker_list=linker_list)
+            else:
+                final_response = self.generator.generate(question=question, retrieved_nodes=retrieved_records, schema_context=retriever.schema_context(), model=model, cypher_query=cypher_query)
 
             retrieved_records_str = "\n".join([str(r) for r in retrieved_records])
             retrieved_records_length = self.metric_tok_length(retrieved_records_str)
@@ -84,7 +89,7 @@ class QASet:
 
             # Process response
             response_json = json.loads(response)
-            entry["Nuggets"] = json.dumps(response_json["nuggets"], ensure_ascii=False)
+            entry["Model_Nuggets"] = json.dumps(response_json["Model_Nuggets"], ensure_ascii=False)
             extracted.append(entry)
 
         df_new = pd.DataFrame(extracted)
@@ -110,7 +115,7 @@ class QASet:
 
             prompt = self.nugget_matching_prompt.format(
                 question=question,
-                model_nuggets=model_entry["Nuggets"],
+                model_nuggets=model_entry["Model_Nuggets"],
                 generated_answer=candidate_answer
             )
             self.logger.info(f"Prompting LLM using: {prompt}")

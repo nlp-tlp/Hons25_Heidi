@@ -41,16 +41,18 @@ class RowAllScopeGraph(SKBGraph):
         self.skb.save_pickle(outpath)
 
 class RowAllScopeRetriever:
-    def __init__(self, graph: RowAllScopeGraph,
-        chat_client: ChatClient, embedding_client: EmbeddingClient
-    ):
+    def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.graph = graph
-        self.chat_client = chat_client
-        self.embedding_client = embedding_client
+        self.allow_linking = False
 
-    def retrieve(self, question: str, k=25, threshold=None):
+        self.graph = RowAllScopeGraph()
+        self.graph.load_chroma()
+        self.chat_client = ChatClient()
+        self.embedding_client = EmbeddingClient()
+
+    def retrieve(self, question: str, k=25, threshold=None, model: str = None):
+        model # not used for baseline vector search
         self.logger.info(f"Question given: {question}")
 
         # No Cypher generation here - just a vector search

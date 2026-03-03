@@ -110,7 +110,7 @@ class Neo4j_DB:
 
     def ftsearch(self, query: str):
         """Full-text search for fuzzy partial matching"""
-        split_text = [f"{s}~" for s in query.split()]
+        split_text = [f"{s}~" for s in query.replace("-", " ").split()]
         cypher_query = f"""
         CALL db.index.fulltext.queryNodes("names", "{" OR ".join(split_text)}")
         YIELD node, score

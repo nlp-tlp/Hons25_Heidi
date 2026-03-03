@@ -1,21 +1,12 @@
 import streamlit as st
 import json
 
-from llm import ChatClient, EmbeddingClient
-from scopes import ConceptTextScopeGraph, ConceptTextScopeRetriever
+from llm import chat_model_choices
+from scopes import retriever_factory
 from generators import FinalGenerator
 
-graph = ConceptTextScopeGraph()
-graph.load_neo4j()
-
-retriever = ConceptTextScopeRetriever(
-    graph=graph,
-    prompt_path="scopes/concept_text/exc_text_prompt.txt",
-    chat_client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"),
-    embedding_client=EmbeddingClient(provider="openai", model="text-embedding-3-small"),
-    allow_descriptive_only=False
-)
-generator = FinalGenerator(client=ChatClient(provider="openai", model="gpt-4.1-2025-04-14"))
+retriever = retriever_factory("concept_text")
+generator = FinalGenerator()
 
 # Page
 st.set_page_config(page_title="Semi-Structured RAG demo", layout="wide")
@@ -32,9 +23,26 @@ with st.sidebar:
     st.markdown("### Configuration")
 
     if "active_retriever_model" not in st.session_state:
-        st.session_state.active_retriever_model = "gpt-4.1-2025-04-14"
+        st.session_state.active_retriever_model = chat_model_choices[0]
     if "active_generator_model" not in st.session_state:
-        st.session_state.active_generator_model = "gpt-4.1-2025-04-14"
+        st.session_state.active_generator_model = chat_model_choices[0]
+
+    with st.form("config_form", border=False, enter_to_submit=False):
+        retrieval_model_config = st.selectbox(
+            "Retriever model",
+            chat_model_choices
+        )
+        generator_model_config = st.selectbox(
+            "Generator model",
+            chat_model_choices
+        )
+
+        submitted = st.form_submit_button("Apply settings for next submit")
+        if submitted:
+            st.session_state["active_retriever_model"] = retrieval_model_config
+            st.session_state["active_generator_model"] = generator_model_config
+
+            st.success("Settings applied successfully. These will be used on your next query.")
 
 for entry in st.session_state.chat_history_concept_text:
     if "config" in entry:
@@ -67,12 +75,12 @@ if question:
                 "generator_model": st.session_state.active_generator_model,
             }
 
-            cypher_query, results, error = retriever.retrieve(question)
+            cypher_query, results, error = retriever.retrieve(question, model=st.session_state.active_retriever_model)
 
             if error:
                 response = "Error has occurred."
             else:
-                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context(), cypher_query=cypher_query)
+                response = generator.generate(question=question, retrieved_nodes=results, schema_context=retriever.schema_context(), cypher_query=cypher_query, model=st.session_state.active_generator_model)
 
     st.session_state.chat_history_concept_text.append({"role": "user", "msg": question})
     if error:

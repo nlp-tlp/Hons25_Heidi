@@ -1,6 +1,6 @@
 ### Task
 
-Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below. Only output the minimal Cypher query, with no markdown wrapping such that it can be directly executed as a query. Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
+Convert natural language questions into Cypher queries, for execution over a Neo4j graph that has the given schema below.  Ensure that more than enough is retrieved - Include any information that might be useful to generate a response.
 
 ### Neo4j graph schema
 
@@ -12,7 +12,7 @@ Convert natural language questions into Cypher queries, for execution over a Neo
 
 ### Extended Cypher functions
 
-Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches.
+Aside from existing Cypher functions and syntax, make use the additional function below where necessary. Any text property matches must be done with this function in WHERE clauses, instead of typical exact matches. Only use them in WHERE clauses, never in clauses like CASE and WHEN.
 
 1. IS_FUZZY_MATCH(text_property, "text_to_match"): Use for filtering string fields that do not have the @match_semantically tag.
 2. IS_SEMANTIC_MATCH(text_property, "text_to_match"): Use for all string fields that have the @match_semantically tag.
@@ -21,9 +21,16 @@ Aside from existing Cypher functions and syntax, make use the additional functio
 
 1. Output the Cypher query with no markdown wrapping such that it can be directly executed.
 2. Do not return node objects. Return entity properties or aggregation aliases.
-3. Any text property matches must be done with the above extended function.
-4. Only use the text matching functions in WHERE clauses, and not others like CASE clauses.
-5. This is a FMEA dataset. Provide all system/ component names when identifying specific failure modes.
+3. Any text property matches must be done with IS_FUZZY_MATCH or IS_SEMANTIC_MATCH.
+4. Only use IS_FUZZY_MATCH and IS_SEMANTIC_MATCH in WHERE clauses. Never in clauses like CASE and WHEN.
+5. Use LIMIT if there may be too many matching records. Avoid too restrictive LIMIT values (e.g. 1).
+6. Provide all system/ component names when identifying specific failure modes.
+7. Do not use comments in the Cypher queries.
+
+Common Cypher mistakes to avoid:
+* All sub queries in an UNION must have the same return column names.
+* Expression in WITH must be aliased (use AS).
+* OVER is not a Cypher function. Do not attempt to use it.
 
 ### Few-shot examples
 

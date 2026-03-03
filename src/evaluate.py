@@ -8,6 +8,8 @@ logging.basicConfig(
     level=logging.CRITICAL,
     format="\n=== %(levelname)s [%(name)s] ===\n%(message)s\n"
 )
+rag_model = "gpt-4.1-2025-04-14"
+# rag_model = "gpt-5.2-2025-12-11"
 
 if __name__ == "__main__":
     # For looping through all evaluation options
@@ -22,7 +24,7 @@ if __name__ == "__main__":
                 continue
             print(f"Running RAG for strategy: {strategy}, entity linking: {allow_linking}")
             run_file_path = f"evaluation/experiment_runs/{strategy}{'_link' if allow_linking else ''}.xlsx"
-            qa_set.run_rag(retriever, run_file_path)
+            qa_set.run_rag(retriever, run_file_path, model=rag_model)
             print(f"Running evaluation for strategy: {strategy}, entity linking: {allow_linking}")
             qa_set.run_match_nuggets(run_file_path)
         exit(0)
@@ -48,7 +50,7 @@ if __name__ == "__main__":
         case "rag":
             print(f"Running RAG run for strategy: {strategy}, entity linking: {allow_linking}")
             run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
-            qa_set.run_rag(retriever, run_file_path)
+            qa_set.run_rag(retriever, run_file_path, model=rag_model)
         case "eval":
             print(f"Running evaluation of RAG run for strategy: {strategy}, entity linking: {allow_linking}")
             run_file_path = f"evaluation/experiment_runs/{strategy}{"_link" if allow_linking else ""}.xlsx"
