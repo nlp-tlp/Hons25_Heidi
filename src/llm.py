@@ -1,6 +1,7 @@
-from pydantic import BaseModel, RootModel
 import logging
 import os
+from pydantic import BaseModel, RootModel
+from datetime import datetime
 from dotenv import load_dotenv
 import openai
 
@@ -21,14 +22,13 @@ class ChatClient:
             model = chat_model_choices[0]
         self.logger.info(f"Prompting Chat LLM at OpenAI model {model}")
 
+        prompt = f"{str(datetime.now())}\n{prompt}" # prevents prompt caching
+
         response = self.client.beta.chat.completions.parse(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            top_p=0.0001, # shouldn't matter, just in case it does
-            seed=12345, # shouldn't matter
-            presence_penalty = 0.0, # default
-            frequency_penalty = 0.0, # default
+            seed=12345, # shouldn't matter, just in case
             **({"response_format": response_format} if response_format is not None else {})
         )
         return response.choices[0].message.content.strip()
